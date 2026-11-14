@@ -1,0 +1,14 @@
+# OS / System Files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Temporary / Cache files
+*.tmp
+.tmp_pages/
+__pycache__/
+*.py[cod]
+.vscode/
+.idea/
