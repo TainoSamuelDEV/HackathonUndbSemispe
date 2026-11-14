@@ -17,7 +17,8 @@ Repositório dedicado ao desenvolvimento da solução para o **Hackathon São Lu
 
 O detalhamento completo do desafio, dores mapeadas, esteira da solução, personas e requisitos de MVP encontram-se em:
 
-👉 **[docs/hackathon.md](docs/hackathon.md)**
+👉 **[docs/hackathon.md](docs/hackathon.md)**  
+📄 **PDF Oficial do Desafio:** [docs/Desafio 4.pdf](docs/Desafio%204.pdf)
 
 ---
 

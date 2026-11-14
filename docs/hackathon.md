@@ -2,7 +2,7 @@
 
 > **Contexto:** Hackathon UNDB / Semispe — Inovação & Tecnologia  
 > **Tema Sorteado:** Desafio 04 — Dificuldade de Conexão entre Talentos, Startups e Empresas  
-> **Arquivo Fonte:** `Desafios  (1) (1).pdf`
+> **Arquivo Fonte:** `docs/Desafio 4.pdf`
 
 ---
 
