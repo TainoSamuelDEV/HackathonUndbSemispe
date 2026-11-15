@@ -23,121 +23,148 @@ export default async function HomePage() {
 
   return (
     <div className="bg-white">
-      {/* HERO — LAYOUT ASSIMÉTRICO COM CARD INCLINADO E BALÃO FLUTUANTE */}
-      <section className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-10 pb-16 lg:pt-14 lg:pb-20">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
-          <div className="lg:col-span-6 space-y-6">
-            <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#F3F8FC] border border-[#D1E3EF] text-xs font-bold text-[#0162A7]">
-              <Sparkles className="w-3.5 h-3.5" />
-              SEMISPE · Parque Tecnológico de São Luís
-            </span>
+      {/* HERO DINÂMICA — VÍDEO DE FUNDO COM OVERLAY TRANSLÚCIDO NAS CORES DO FAROL */}
+      <section className="relative overflow-hidden bg-[#0B2540] text-white mb-12">
+        {/* Vídeo de fundo (pessoas conversando, se conectando e estudando) */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover scale-[1.02]"
+        >
+          <source src="/videos/hero-farol.mp4" type="video/mp4" />
+        </video>
 
-            <h1 className="font-heading text-4xl sm:text-5xl lg:text-[52px] font-extrabold text-[#0B2540] leading-[1.08]">
-              Oportunidades e qualificação para <span className="text-[#0162A7]">São Luís</span>
-            </h1>
+        {/* Mistura translúcida das cores definidas do FAROL (#0B2540, #0162A7, #0A7B36, #009CDC, #FADC00) */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-br from-[#0B2540]/85 via-[#0162A7]/65 to-[#0A7B36]/55"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#009CDC]/25 blur-3xl pointer-events-none"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute -bottom-24 right-0 w-96 h-96 rounded-full bg-[#FADC00]/15 blur-3xl pointer-events-none"
+        />
 
-            <p className="text-base text-[#66788A] max-w-[520px] leading-relaxed">
-              O <strong>FAROL</strong> conecta moradores — com prioridade inicial no eixo{' '}
-              <strong>Itaqui-Bacanga</strong> — a vagas locais, cursos gratuitos da SEMISPE e
-              atendimento direto pelo WhatsApp.
-            </p>
+        <div className="relative z-10 max-w-[1200px] mx-auto px-4 sm:px-6 pt-12 pb-16 lg:pt-16 lg:pb-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
+            <div className="lg:col-span-7 space-y-6">
+              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-xs font-bold text-[#FADC00]">
+                <Sparkles className="w-3.5 h-3.5" />
+                SEMISPE · Parque Tecnológico de São Luís
+              </span>
 
-            {/* Busca rápida compacta + CTA pill com seta circular */}
-            <form
-              action="/vagas"
-              method="GET"
-              className="bg-[#F3F8FC] p-2 rounded-full border border-[#DCE7EF] flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-[540px]"
-            >
-              <div className="flex-1 flex items-center gap-2 pl-4 pr-2">
-                <Search className="w-4 h-4 text-[#66788A] shrink-0" />
-                <input
-                  name="busca"
-                  placeholder="Cargo, área ou bairro..."
-                  className="w-full bg-transparent py-2 text-sm text-[#0B2540] placeholder:text-[#66788A] focus:outline-none"
-                />
+              <h1 className="font-heading text-4xl sm:text-5xl lg:text-[54px] font-extrabold text-white leading-[1.06] tracking-tight drop-shadow-sm">
+                Seu futuro ganha direção quando{' '}
+                <span className="text-[#FADC00]">conhecimento e oportunidade</span> se encontram.
+              </h1>
+
+              <p className="text-base sm:text-lg text-slate-100 max-w-[580px] leading-relaxed">
+                O <strong>FAROL</strong> conecta moradores de São Luís — com prioridade no eixo{' '}
+                <strong>Itaqui-Bacanga</strong> — a vagas reais, cursos gratuitos da SEMISPE,
+                eventos de startups e atendimento direto pelo WhatsApp.
+              </p>
+
+              {/* Busca rápida compacta + CTA pill com seta circular */}
+              <form
+                action="/vagas"
+                method="GET"
+                className="bg-white/95 backdrop-blur-md p-2 rounded-full border border-white/40 shadow-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-[560px]"
+              >
+                <div className="flex-1 flex items-center gap-2 pl-4 pr-2">
+                  <Search className="w-4 h-4 text-[#0162A7] shrink-0" />
+                  <input
+                    name="busca"
+                    placeholder="Cargo, área ou bairro de São Luís..."
+                    className="w-full bg-transparent py-2 text-sm text-[#0B2540] placeholder:text-[#66788A] focus:outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center gap-2 min-h-[44px] pl-5 pr-2 rounded-full bg-[#0162A7] text-white text-sm font-bold hover:bg-[#004F8A] transition-colors"
+                >
+                  <span>Encontrar vagas</span>
+                  <span className="w-8 h-8 rounded-full bg-[#FADC00] text-[#0B2540] flex items-center justify-center">
+                    <ArrowRight className="w-4 h-4" />
+                  </span>
+                </button>
+              </form>
+
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Link
+                  href="/cursos"
+                  className="inline-flex items-center gap-2 min-h-[42px] px-5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-sm font-bold text-white hover:bg-white/25 transition-colors"
+                >
+                  <GraduationCap className="w-4 h-4 text-[#FADC00]" />
+                  Conhecer cursos
+                </Link>
+                <Link
+                  href="/newsletter"
+                  className="inline-flex items-center gap-2 min-h-[42px] px-5 rounded-full bg-[#0A7B36]/85 backdrop-blur-md border border-[#93C05F]/40 text-sm font-bold text-white hover:bg-[#0A7B36] transition-colors"
+                >
+                  <Sparkles className="w-4 h-4 text-[#FADC00]" />
+                  Editais & Eventos SLZ
+                </Link>
+                <Link
+                  href="/entrar"
+                  className="inline-flex items-center gap-2 min-h-[42px] px-5 rounded-full bg-[#FADC00] text-sm font-bold text-[#0B2540] hover:bg-[#E8CB00] transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Criar currículo com IA
+                </Link>
               </div>
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center gap-2 min-h-[44px] pl-5 pr-2 rounded-full bg-[#0162A7] text-white text-sm font-bold hover:bg-[#004F8A] transition-colors"
-              >
-                <span>Encontrar vagas</span>
-                <span className="w-8 h-8 rounded-full bg-[#FADC00] text-[#0B2540] flex items-center justify-center">
-                  <ArrowRight className="w-4 h-4" />
-                </span>
-              </button>
-            </form>
-
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              <Link
-                href="/cursos"
-                className="inline-flex items-center gap-2 min-h-[42px] px-5 rounded-full border border-[#DCE7EF] text-sm font-bold text-[#0B2540] hover:border-[#0162A7] hover:text-[#0162A7] transition-colors"
-              >
-                <GraduationCap className="w-4 h-4 text-[#0A7B36]" />
-                Conhecer cursos
-              </Link>
-              <Link
-                href="/entrar"
-                className="inline-flex items-center gap-2 min-h-[42px] px-5 rounded-full bg-[#EAF7F0] text-sm font-bold text-[#0A7B36] hover:bg-[#d8f1e3] transition-colors"
-              >
-                <MessageCircle className="w-4 h-4" />
-                Criar currículo com IA FAROL
-              </Link>
             </div>
-          </div>
 
-          {/* Lado direito — Visual inclinado + Formas orgânicas + Card flutuante */}
-          <div className="lg:col-span-6 relative flex justify-center lg:justify-end py-6">
-            <div className="relative w-full max-w-[440px]">
-              {/* Camadas de fundo inspiradas no símbolo do Parque */}
-              <div
-                aria-hidden="true"
-                className="absolute -inset-4 rounded-[32px] bg-[#93C05F]/30 -rotate-6"
-              />
-              <div
-                aria-hidden="true"
-                className="absolute -inset-2 rounded-[32px] bg-[#009CDC]/20 rotate-3"
-              />
+            {/* Lado direito — Card Glassmorphism flutuante sobre o vídeo */}
+            <div className="lg:col-span-5 relative flex justify-center lg:justify-end py-4">
+              <div className="relative w-full max-w-[420px]">
+                <div
+                  aria-hidden="true"
+                  className="absolute -inset-3 rounded-[30px] bg-[#93C05F]/25 -rotate-3 backdrop-blur-sm"
+                />
+                <div
+                  aria-hidden="true"
+                  className="absolute -inset-1.5 rounded-[30px] bg-[#009CDC]/25 rotate-2"
+                />
 
-              {/* Card principal inclinado */}
-              <div className="relative bg-[#0B2540] text-white rounded-[28px] p-6 sm:p-7 rotate-2 shadow-xl space-y-5">
-                <div className="flex items-center justify-between">
-                  <span className="px-3 py-1 rounded-full bg-white/10 text-xs font-bold text-[#FADC00]">
-                    Match 70/30 Auditável
-                  </span>
-                  <span className="px-3 py-1 rounded-full bg-[#0A7B36] text-xs font-bold text-white">
-                    WhatsApp + Portal
-                  </span>
-                </div>
-
-                <div className="space-y-3 bg-white/5 rounded-[18px] p-4 border border-white/10">
-                  <div className="flex items-center justify-between text-xs text-slate-300">
-                    <span>Ajudante de Manutenção</span>
-                    <strong className="text-[#93C05F]">82% match</strong>
+                <div className="relative bg-[#0B2540]/80 backdrop-blur-md border border-white/20 text-white rounded-[26px] p-6 shadow-2xl space-y-5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="px-3 py-1 rounded-full bg-white/15 text-xs font-bold text-[#FADC00]">
+                      Match 70/30 Auditável
+                    </span>
+                    <span className="px-3 py-1 rounded-full bg-[#0A7B36]/90 text-xs font-bold text-white">
+                      WhatsApp + Portal
+                    </span>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div className="h-full w-[82%] rounded-full bg-[#93C05F]" />
+
+                  <div className="space-y-3 bg-white/10 rounded-[18px] p-4 border border-white/15">
+                    <div className="flex items-center justify-between text-xs text-slate-200">
+                      <span>Ajudante de Manutenção</span>
+                      <strong className="text-[#FADC00]">82% match</strong>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-white/15 overflow-hidden">
+                      <div className="h-full w-[82%] rounded-full bg-[#93C05F]" />
+                    </div>
+                    <p className="text-[11px] text-slate-200 leading-relaxed">
+                      ✅ Atende: Ensino Médio, Experiência em oficina
+                      <br />
+                      📌 Sugestão de curso: NR-12 (16h gratuito)
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    ✅ Atende: Ensino Médio, Experiência em oficina
-                    <br />
-                    📌 Sugestão de curso: NR-12 (16h gratuito)
-                  </p>
-                </div>
 
-                <div className="flex items-center justify-between text-xs text-slate-300 pt-1">
-                  <span>Sincronizado em tempo real</span>
-                  <span className="font-bold text-white">IA FAROL</span>
-                </div>
-              </div>
-
-              {/* Balão flutuante inclinado sobrepondo o canto inferior */}
-              <div className="relative sm:absolute sm:-left-10 sm:-bottom-6 mt-4 sm:mt-0 bg-white border border-[#DCE7EF] rounded-[20px] p-4 shadow-lg max-w-[270px] -rotate-2">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-xs font-semibold text-[#0B2540] leading-relaxed">
-                    Fale com a <strong>IA FAROL</strong> no WhatsApp para montar seu currículo e
-                    descobrir vagas perto de você.
-                  </p>
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#0A7B36] shrink-0 mt-1" />
+                  <div className="bg-white/95 text-[#0B2540] rounded-[16px] p-3.5 shadow-md flex items-start justify-between gap-2">
+                    <p className="text-xs font-semibold leading-relaxed">
+                      Mande um áudio ou PDF do seu currículo para a <strong>IA FAROL</strong> no
+                      WhatsApp e descubra vagas perto de você.
+                    </p>
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#0A7B36] shrink-0 mt-1" />
+                  </div>
                 </div>
               </div>
             </div>
