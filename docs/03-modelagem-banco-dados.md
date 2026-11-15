@@ -2,7 +2,8 @@
 
 > **Projeto:** **FAROL** — *Formação, Ações e Rede de Oportunidades Locais*  
 > **SGBD:** PostgreSQL 15+ (via **Supabase Self-Hosted**)  
-> **Script DDL Oficial:** [database/schema.sql](../database/schema.sql)
+> **Migration Oficial:** [supabase/migrations/20261115000001_init_farol.sql](../supabase/migrations/20261115000001_init_farol.sql)  
+> **Seed Inicial:** [supabase/seed.sql](../supabase/seed.sql)
 
 Este documento descreve o Diagrama Entidade-Relacionamento (DER), o dicionário de dados e as garantias de integridade do banco único compartilhado entre o **Portal Web** e a **IA FAROL (WhatsApp / Evolution API)**.
 
@@ -71,4 +72,4 @@ erDiagram
 * **`vw_ranking_pedidos_cursos`:** Agrega `pedidos_cursos` por tema normalizado e bairro, contabilizando o volume de cidadãos interessados para apoiar a SEMISPE na abertura de novas turmas.
 * **Índices:** Índices compostos em `vagas(status, bairro, modalidade)`, `candidaturas(candidato_id, status)`, `conversas_whatsapp(telefone)` e `pedidos_cursos(tema_desejado)` garantem respostas rápidas tanto nas listagens do portal quanto nas consultas em tempo real da IA FAROL.
 
-> O código SQL completo com `ENUM`s, constraints, triggers de `atualizado_em`, trigger de imutabilidade e views está disponível em [database/schema.sql](../database/schema.sql).
+> O código SQL completo com `ENUM`s, constraints, triggers de `atualizado_em`, trigger de imutabilidade e views está disponível em [supabase/migrations/20261115000001_init_farol.sql](../supabase/migrations/20261115000001_init_farol.sql).

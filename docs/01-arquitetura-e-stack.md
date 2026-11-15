@@ -100,9 +100,10 @@ A organização de diretórios impõe fronteiras claras para que frontend, backe
 
 ```text
 farol/
-├── database/
-│   ├── schema.sql                       # Script DDL oficial (PostgreSQL / Supabase)
-│   └── seed.sql                         # Dados iniciais demonstrativos e perfis base
+├── supabase/
+│   ├── migrations/
+│   │   └── 20261115000001_init_farol.sql # Migration inicial (PostgreSQL / Supabase)
+│   └── seed.sql                          # Dados iniciais demonstrativos e perfis base
 ├── docs/                                # Documentação técnica de engenharia (01 a 05)
 ├── public/                              # Logos oficiais (Parque Tecnológico / FAROL)
 ├── src/

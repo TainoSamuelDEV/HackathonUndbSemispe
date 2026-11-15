@@ -27,7 +27,7 @@ Sistema único desenvolvido para o **Hackathon São Luís do Futuro (UNDB / SEMI
 3. [03. Modelagem do Banco de Dados (PostgreSQL / Supabase Self-Hosted)](./docs/03-modelagem-banco-dados.md)
 4. [04. Contrato da API REST, Endpoints para IA FAROL e Evolution API](./docs/04-contrato-api-e-integracao-ia.md)
 5. [05. Mapeamento de Telas, Design System e Jornadas](./docs/05-mapeamento-telas-e-jornadas.md)
-6. [Script SQL Oficial (Supabase / PostgreSQL)](./database/schema.sql)
+6. [Migration Inicial Supabase (PostgreSQL)](./supabase/migrations/20261115000001_init_farol.sql) e [Seed Inicial](./supabase/seed.sql)
 
 ### Documentos de Referência / Origem
 * [Contexto do Hackathon](./docs/contexto/hackathon.md) · [PDF Oficial do Desafio](./docs/contexto/Desafio%204.pdf)
