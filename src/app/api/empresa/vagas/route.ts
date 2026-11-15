@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { farolService } from '@/server/application/FarolService';
 import { AcessoNegadoError, NaoAutenticadoError } from '@/server/domain/errors/DomainError';
 import { obterSessaoAtual } from '@/server/infrastructure/auth/jwt';
-import { farolMemoryStore } from '@/server/infrastructure/repositories/FarolDataStore';
 import { handleApiError, ok } from '@/server/infrastructure/http/apiResponse';
 
 const novaVagaSchema = z.object({
@@ -48,7 +47,7 @@ export async function GET() {
       throw new AcessoNegadoError();
     }
 
-    const vagas = farolMemoryStore.vagas.filter((v) => v.empresaId === sessao.empresaId);
+    const vagas = await farolService.listarVagasDaEmpresa(sessao.empresaId);
     return ok({ vagas });
   } catch (error) {
     return handleApiError(error);

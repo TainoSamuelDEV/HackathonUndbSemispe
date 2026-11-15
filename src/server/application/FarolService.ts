@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { isSupabaseConfigured } from '@/server/config/env';
 import { calcularCompatibilidade, normalizarTexto } from '@/server/domain/matching/MatchEngine';
 import {
   AcessoNegadoError,
@@ -15,6 +16,7 @@ import {
   type PedidoCursoRecord,
   type VagaRecord,
 } from '@/server/infrastructure/repositories/FarolDataStore';
+import { supabaseFarolRepo } from '@/server/infrastructure/repositories/SupabaseFarolRepository';
 import { assinarTokenSessao, hashSenha, verificarSenha } from '@/server/infrastructure/auth/jwt';
 import type {
   CanalOrigem,
@@ -30,12 +32,40 @@ import type {
 } from '@/types/farol';
 
 export class FarolService {
+  private usarSupabase(): boolean {
+    return isSupabaseConfigured();
+  }
+
   // --------------------------------------------------------------------------
   // AUTENTICAÇÃO
   // --------------------------------------------------------------------------
 
   async autenticar(email: string, senha: string): Promise<{ token: string; sessao: UsuarioSessao }> {
     const emailNorm = email.trim().toLowerCase();
+
+    if (this.usarSupabase()) {
+      const encontrado = await supabaseFarolRepo.buscarUsuarioPorEmail(emailNorm);
+      if (!encontrado || !encontrado.usuario.senhaHash) {
+        throw new RegraNegocioError('E-mail ou senha inválidos.');
+      }
+
+      const senhaOk = await verificarSenha(senha, encontrado.usuario.senhaHash);
+      if (!senhaOk) {
+        throw new RegraNegocioError('E-mail ou senha inválidos.');
+      }
+
+      const sessao: UsuarioSessao = {
+        id: encontrado.usuario.id,
+        email: encontrado.usuario.email,
+        papel: encontrado.usuario.papel,
+        nome: encontrado.nome,
+        candidatoId: encontrado.candidatoId,
+        empresaId: encontrado.empresaId,
+        whatsappVerificado: encontrado.usuario.whatsappVerificado,
+      };
+      return { token: assinarTokenSessao(sessao), sessao };
+    }
+
     const usuario = farolMemoryStore.usuarios.find(
       (u) => u.email?.toLowerCase() === emailNorm && u.ativo
     );
@@ -55,10 +85,7 @@ export class FarolService {
       id: usuario.id,
       email: usuario.email,
       papel: usuario.papel,
-      nome:
-        candidato?.nomeExibicao ??
-        empresa?.nomeFantasia ??
-        'Equipe SEMISPE',
+      nome: candidato?.nomeExibicao ?? empresa?.nomeFantasia ?? 'Equipe SEMISPE',
       candidatoId: candidato?.id,
       empresaId: empresa?.id,
       whatsappVerificado: usuario.whatsappVerificado,
@@ -75,13 +102,30 @@ export class FarolService {
     senha: string;
   }): Promise<{ token: string; sessao: UsuarioSessao }> {
     const emailNorm = input.email.trim().toLowerCase();
+    const senhaHash = await hashSenha(input.senha);
+
+    if (this.usarSupabase()) {
+      const { usuarioId, candidatoId, nomeExibicao } = await supabaseFarolRepo.criarCandidato({
+        ...input,
+        senhaHash,
+      });
+      const sessao: UsuarioSessao = {
+        id: usuarioId,
+        email: emailNorm,
+        papel: 'CANDIDATO',
+        nome: nomeExibicao,
+        candidatoId,
+        whatsappVerificado: false,
+      };
+      return { token: assinarTokenSessao(sessao), sessao };
+    }
+
     if (farolMemoryStore.usuarios.some((u) => u.email?.toLowerCase() === emailNorm)) {
       throw new RegraNegocioError('Este e-mail já está cadastrado.');
     }
 
     const usuarioId = crypto.randomUUID();
     const candidatoId = crypto.randomUUID();
-    const senhaHash = await hashSenha(input.senha);
 
     farolMemoryStore.usuarios.push({
       id: usuarioId,
@@ -138,19 +182,36 @@ export class FarolService {
     telefone: string;
     senha: string;
   }): Promise<{ token: string; sessao: UsuarioSessao }> {
-    const emailNorm = input.email.trim().toLowerCase();
-    if (farolMemoryStore.usuarios.some((u) => u.email?.toLowerCase() === emailNorm)) {
-      throw new RegraNegocioError('Este e-mail já está cadastrado.');
-    }
-
     const cnpjLimpo = input.cnpj.replace(/\D/g, '');
     if (cnpjLimpo.length !== 14) {
       throw new RegraNegocioError('CNPJ inválido. Informe os 14 dígitos do CNPJ ativo ou MEI.');
     }
 
+    const emailNorm = input.email.trim().toLowerCase();
+    const senhaHash = await hashSenha(input.senha);
+
+    if (this.usarSupabase()) {
+      const { usuarioId, empresaId, nomeFantasia } = await supabaseFarolRepo.criarEmpresa({
+        ...input,
+        senhaHash,
+      });
+      const sessao: UsuarioSessao = {
+        id: usuarioId,
+        email: emailNorm,
+        papel: 'EMPRESA',
+        nome: nomeFantasia,
+        empresaId,
+        whatsappVerificado: false,
+      };
+      return { token: assinarTokenSessao(sessao), sessao };
+    }
+
+    if (farolMemoryStore.usuarios.some((u) => u.email?.toLowerCase() === emailNorm)) {
+      throw new RegraNegocioError('Este e-mail já está cadastrado.');
+    }
+
     const usuarioId = crypto.randomUUID();
     const empresaId = crypto.randomUUID();
-    const senhaHash = await hashSenha(input.senha);
 
     farolMemoryStore.usuarios.push({
       id: usuarioId,
@@ -200,6 +261,10 @@ export class FarolService {
     modalidade?: ModalidadeTrabalho;
     area?: string;
   }): Promise<VagaRecord[]> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.listarVagasPublicas(filtros);
+    }
+
     let lista = farolMemoryStore.vagas.filter((v) => v.status === 'PUBLICADA');
 
     if (filtros?.busca) {
@@ -227,16 +292,19 @@ export class FarolService {
   }
 
   async obterVagaPorId(vagaId: string): Promise<VagaRecord> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.obterVagaPorId(vagaId);
+    }
+
     const vaga = farolMemoryStore.vagas.find((v) => v.id === vagaId);
     if (!vaga) throw new RecursoNaoEncontradoError('Vaga não encontrada.');
     return vaga;
   }
 
   async calcularMatchParaCandidato(candidatoId: string, vagaId: string): Promise<ResultadoMatch> {
-    const candidato = farolMemoryStore.candidatos.find((c) => c.id === candidatoId);
-    if (!candidato) throw new RecursoNaoEncontradoError('Candidato não encontrado.');
-
+    const candidato = await this.obterCandidato(candidatoId);
     const vaga = await this.obterVagaPorId(vagaId);
+
     return calcularCompatibilidade(
       {
         escolaridade: candidato.escolaridade,
@@ -254,10 +322,9 @@ export class FarolService {
     area?: string,
     limit = 3
   ): Promise<Array<{ vaga: VagaRecord; match: ResultadoMatch }>> {
-    const candidato = farolMemoryStore.candidatos.find((c) => c.id === candidatoId);
-    if (!candidato) throw new RecursoNaoEncontradoError('Candidato não encontrado.');
-
+    const candidato = await this.obterCandidato(candidatoId);
     const vagas = await this.listarVagasPublicas({ area });
+
     const avaliadas = vagas.map((vaga) => ({
       vaga,
       match: calcularCompatibilidade(
@@ -280,6 +347,15 @@ export class FarolService {
       throw new RegraNegocioError('As inscrições para esta vaga foram encerradas.');
     }
 
+    const match = await this.calcularMatchParaCandidato(input.candidatoId, input.vagaId);
+
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.criarCandidatura({
+        ...input,
+        match,
+      });
+    }
+
     const jaExiste = farolMemoryStore.candidaturas.find(
       (c) => c.vagaId === input.vagaId && c.candidatoId === input.candidatoId
     );
@@ -287,9 +363,7 @@ export class FarolService {
       throw new RegraNegocioError('Você já se candidatou a esta oportunidade.');
     }
 
-    const match = await this.calcularMatchParaCandidato(input.candidatoId, input.vagaId);
     const agora = new Date().toISOString();
-
     const nova: CandidaturaRecord = {
       id: crypto.randomUUID(),
       vagaId: input.vagaId,
@@ -316,6 +390,10 @@ export class FarolService {
   }
 
   async listarCandidaturasDoCandidato(candidatoId: string) {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.listarCandidaturasDoCandidato(candidatoId);
+    }
+
     return farolMemoryStore.candidaturas
       .filter((c) => c.candidatoId === candidatoId)
       .map((c) => ({
@@ -329,6 +407,10 @@ export class FarolService {
   // --------------------------------------------------------------------------
 
   async obterCandidato(candidatoId: string): Promise<CandidatoRecord> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.obterCandidato(candidatoId);
+    }
+
     const cand = farolMemoryStore.candidatos.find((c) => c.id === candidatoId);
     if (!cand) throw new RecursoNaoEncontradoError('Perfil de candidato não encontrado.');
     return cand;
@@ -354,6 +436,10 @@ export class FarolService {
       >
     >
   ): Promise<CandidatoRecord> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.atualizarCurriculoCandidato(candidatoId, dados);
+    }
+
     const cand = await this.obterCandidato(candidatoId);
     Object.assign(cand, dados);
     return cand;
@@ -362,6 +448,13 @@ export class FarolService {
   // --------------------------------------------------------------------------
   // EMPRESA (REGRA: NUNCA EXPÕE SCORE DO CANDIDATO)
   // --------------------------------------------------------------------------
+
+  async listarVagasDaEmpresa(empresaId: string): Promise<VagaRecord[]> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.listarVagasDaEmpresa(empresaId);
+    }
+    return farolMemoryStore.vagas.filter((v) => v.empresaId === empresaId);
+  }
 
   async publicarVagaEmpresa(
     empresaId: string,
@@ -380,6 +473,10 @@ export class FarolService {
       requisitos: RequisitoVaga[];
     }
   ): Promise<VagaRecord> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.publicarVagaEmpresa(empresaId, input);
+    }
+
     const empresa = farolMemoryStore.empresas.find((e) => e.id === empresaId);
     if (!empresa) throw new RecursoNaoEncontradoError('Empresa não encontrada.');
 
@@ -419,7 +516,10 @@ export class FarolService {
       throw new AcessoNegadoError('Você só pode visualizar candidaturas de vagas da sua empresa.');
     }
 
-    // Regra rígida: scoreCalculado e detalhesMatch são omitidos para a empresa
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.listarCandidatosDaVagaParaEmpresa(vagaId);
+    }
+
     return farolMemoryStore.candidaturas
       .filter((c) => c.vagaId === vagaId)
       .map((c) => {
@@ -471,6 +571,10 @@ export class FarolService {
   }
 
   async buscarProfissionaisServicos(filtros?: { busca?: string; bairro?: string }) {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.buscarProfissionaisServicos(filtros);
+    }
+
     let lista = farolMemoryStore.candidatos.filter((c) => c.visivelServicos);
     if (filtros?.busca) {
       const q = normalizarTexto(filtros.busca);
@@ -501,6 +605,10 @@ export class FarolService {
   // --------------------------------------------------------------------------
 
   async listarCursos(tipo?: TipoCurso): Promise<CursoRecord[]> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.listarCursos(tipo);
+    }
+
     return farolMemoryStore.cursos.filter(
       (c) => c.status === 'ATIVO' && (!tipo || c.tipo === tipo)
     );
@@ -516,12 +624,17 @@ export class FarolService {
       const textoCurso = normalizarTexto(
         `${curso.titulo} ${curso.area} ${curso.competenciasDesenvolvidas.join(' ')}`
       );
-      const hits = termos.filter((t) => textoCurso.includes(t) || t.includes(normalizarTexto(curso.area))).length;
+      const hits = termos.filter(
+        (t) => textoCurso.includes(t) || t.includes(normalizarTexto(curso.area))
+      ).length;
       return { curso, hits };
     });
 
     pontuados.sort((a, b) => b.hits - a.hits);
-    return pontuados.filter((p) => p.hits > 0).slice(0, limit).map((p) => p.curso);
+    return pontuados
+      .filter((p) => p.hits > 0)
+      .slice(0, limit)
+      .map((p) => p.curso);
   }
 
   async solicitarInscricaoCurso(input: {
@@ -529,6 +642,10 @@ export class FarolService {
     turmaId: string;
     origemCanal: CanalOrigem;
   }): Promise<InscricaoCursoRecord> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.solicitarInscricaoCurso(input);
+    }
+
     const curso = farolMemoryStore.cursos.find((c) => c.turmas.some((t) => t.id === input.turmaId));
     if (!curso) throw new RecursoNaoEncontradoError('Turma não encontrada.');
 
@@ -563,6 +680,10 @@ export class FarolService {
     bairro?: string | null;
     origemCanal: CanalOrigem;
   }): Promise<PedidoCursoRecord> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.registrarPedidoCurso(input);
+    }
+
     const pedido: PedidoCursoRecord = {
       id: crypto.randomUUID(),
       candidatoId: input.candidatoId,
@@ -585,6 +706,10 @@ export class FarolService {
   // --------------------------------------------------------------------------
 
   async obterDashboardSemispe() {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.obterDashboardSemispe();
+    }
+
     const rankingMap = new Map<string, { tema: string; total: number; bairros: Set<string> }>();
     for (const p of farolMemoryStore.pedidosCursos) {
       const atual = rankingMap.get(p.temaNormalizado) ?? {
@@ -626,6 +751,10 @@ export class FarolService {
   // --------------------------------------------------------------------------
 
   async obterOuCriarConversaWhatsApp(telefone: string): Promise<ConversaWhatsAppRecord> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.obterOuCriarConversaWhatsApp(telefone);
+    }
+
     let conv = farolMemoryStore.conversasWhatsApp.find((c) => c.telefone === telefone);
     if (!conv) {
       const usuario = farolMemoryStore.usuarios.find((u) => u.telefoneWhatsapp === telefone);
@@ -653,6 +782,15 @@ export class FarolService {
     contextoPatch?: Record<string, unknown>,
     atendimentoHumano?: boolean
   ): Promise<ConversaWhatsAppRecord> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.atualizarEstadoConversaWhatsApp(
+        telefone,
+        estadoAtual,
+        contextoPatch,
+        atendimentoHumano
+      );
+    }
+
     const conv = await this.obterOuCriarConversaWhatsApp(telefone);
     conv.estadoAtual = estadoAtual;
     if (contextoPatch) {

@@ -3,14 +3,14 @@
 -- Senha padrão de demonstração para todos os usuários: "123456"
 -- ============================================================================
 
--- Hash bcrypt de "123456" ($2b$10$...)
+-- Hash bcrypt de "123456"
 INSERT INTO usuarios (id, email, senha_hash, papel, telefone_whatsapp, whatsapp_verificado)
 VALUES
-  ('00000000-0000-0000-0000-000000000001', 'admin@farol.slz.br', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'ADMIN_SEMISPE', NULL, FALSE),
-  ('00000000-0000-0000-0000-000000000002', 'rh@portoitacai.com.br', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'EMPRESA', NULL, FALSE),
-  ('00000000-0000-0000-0000-000000000003', 'contato@inovaslz.com.br', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'EMPRESA', NULL, FALSE),
-  ('00000000-0000-0000-0000-000000000004', 'marcos.silva@exemplo.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'CANDIDATO', '5598991234567', TRUE),
-  ('00000000-0000-0000-0000-000000000005', 'ana.costa@exemplo.com', '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'CANDIDATO', '5598992345678', TRUE)
+  ('00000000-0000-0000-0000-000000000001', 'admin@farol.slz.br', '$2b$10$ogcJqgKAmHXIiPIku56s3ukyDCrDMgqbMxBc1I6xpejzSDAofav2C', 'ADMIN_SEMISPE', NULL, FALSE),
+  ('00000000-0000-0000-0000-000000000002', 'rh@portoitacai.com.br', '$2b$10$ogcJqgKAmHXIiPIku56s3ukyDCrDMgqbMxBc1I6xpejzSDAofav2C', 'EMPRESA', NULL, FALSE),
+  ('00000000-0000-0000-0000-000000000003', 'contato@inovaslz.com.br', '$2b$10$ogcJqgKAmHXIiPIku56s3ukyDCrDMgqbMxBc1I6xpejzSDAofav2C', 'EMPRESA', NULL, FALSE),
+  ('00000000-0000-0000-0000-000000000004', 'marcos.silva@exemplo.com', '$2b$10$ogcJqgKAmHXIiPIku56s3ukyDCrDMgqbMxBc1I6xpejzSDAofav2C', 'CANDIDATO', '5598991234567', TRUE),
+  ('00000000-0000-0000-0000-000000000005', 'ana.costa@exemplo.com', '$2b$10$ogcJqgKAmHXIiPIku56s3ukyDCrDMgqbMxBc1I6xpejzSDAofav2C', 'CANDIDATO', '5598992345678', TRUE)
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO empresas (id, usuario_id, cnpj, razao_social, nome_fantasia, eh_mei, setor, bairro, telefone, responsavel_nome, status_validacao)
