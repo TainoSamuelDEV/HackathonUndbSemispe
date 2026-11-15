@@ -54,34 +54,31 @@ export default async function HomePage() {
 
         <div className="relative z-10 max-w-[1200px] mx-auto px-4 sm:px-6 pt-7 pb-8 sm:pt-12 sm:pb-14 lg:pt-16 lg:pb-24">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-7 space-y-4 sm:space-y-6">
+            <div className="lg:col-span-7 space-y-4 sm:space-y-5">
               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-[11px] sm:text-xs font-bold text-[#FADC00]">
                 <Sparkles className="w-3.5 h-3.5" />
-                SEMISPE · Parque Tecnológico de São Luís
+                SEMISPE · São Luís
               </span>
 
-              <h1 className="font-heading text-[28px] sm:text-5xl lg:text-[54px] font-extrabold text-white leading-[1.1] tracking-tight drop-shadow-sm">
-                Seu futuro ganha direção quando{' '}
-                <span className="text-[#FADC00]">conhecimento e oportunidade</span> se encontram.
+              <h1 className="font-heading text-3xl sm:text-5xl lg:text-[54px] font-extrabold text-white leading-[1.08] tracking-tight drop-shadow-sm">
+                Oportunidades reais em <span className="text-[#FADC00]">São Luís</span>.
               </h1>
 
-              <p className="text-sm sm:text-lg text-slate-100 max-w-[580px] leading-relaxed">
-                O <strong>FAROL</strong> conecta moradores de São Luís — com prioridade no eixo{' '}
-                <strong>Itaqui-Bacanga</strong> — a vagas reais, cursos gratuitos da SEMISPE,
-                eventos de startups e atendimento direto pelo WhatsApp.
+              <p className="text-sm sm:text-base text-slate-100 max-w-[460px] leading-relaxed">
+                Vagas locais, cursos gratuitos da SEMISPE e apoio pelo WhatsApp.
               </p>
 
               {/* Busca rápida: retângulo arredondado no mobile, pill no desktop */}
               <form
                 action="/vagas"
                 method="GET"
-                className="bg-white/95 backdrop-blur-md p-2.5 sm:p-2 rounded-[20px] sm:rounded-full border border-white/40 shadow-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-[560px]"
+                className="bg-white/95 backdrop-blur-md p-2.5 sm:p-2 rounded-[20px] sm:rounded-full border border-white/40 shadow-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-[520px]"
               >
                 <div className="flex-1 flex items-center gap-2.5 px-3 sm:pl-4 sm:pr-2">
                   <Search className="w-4 h-4 text-[#0162A7] shrink-0" />
                   <input
                     name="busca"
-                    placeholder="Cargo, área ou bairro de São Luís..."
+                    placeholder="Cargo ou bairro..."
                     className="w-full bg-transparent py-2 text-sm text-[#0B2540] placeholder:text-[#66788A] focus:outline-none"
                   />
                 </div>
@@ -96,27 +93,20 @@ export default async function HomePage() {
                 </button>
               </form>
 
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-1">
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
                 <Link
                   href="/cursos"
-                  className="inline-flex items-center gap-1.5 min-h-[38px] sm:min-h-[42px] px-3.5 sm:px-5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-xs sm:text-sm font-bold text-white hover:bg-white/25 transition-colors"
+                  className="inline-flex items-center gap-1.5 min-h-[38px] sm:min-h-[40px] px-4 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-xs sm:text-sm font-bold text-white hover:bg-white/25 transition-colors"
                 >
                   <GraduationCap className="w-4 h-4 text-[#FADC00]" />
-                  Conhecer cursos
+                  Cursos gratuitos
                 </Link>
                 <Link
                   href="/newsletter"
-                  className="inline-flex items-center gap-1.5 min-h-[38px] sm:min-h-[42px] px-3.5 sm:px-5 rounded-full bg-[#0A7B36]/85 backdrop-blur-md border border-[#93C05F]/40 text-xs sm:text-sm font-bold text-white hover:bg-[#0A7B36] transition-colors"
+                  className="inline-flex items-center gap-1.5 min-h-[38px] sm:min-h-[40px] px-4 rounded-full bg-[#FADC00] text-xs sm:text-sm font-bold text-[#0B2540] hover:bg-[#E8CB00] transition-colors"
                 >
-                  <Sparkles className="w-4 h-4 text-[#FADC00]" />
-                  Editais & Eventos SLZ
-                </Link>
-                <Link
-                  href="/entrar"
-                  className="inline-flex items-center gap-1.5 min-h-[38px] sm:min-h-[42px] px-3.5 sm:px-5 rounded-full bg-[#FADC00] text-xs sm:text-sm font-bold text-[#0B2540] hover:bg-[#E8CB00] transition-colors"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Criar currículo com IA
+                  <Sparkles className="w-4 h-4" />
+                  Editais & Eventos
                 </Link>
               </div>
             </div>
