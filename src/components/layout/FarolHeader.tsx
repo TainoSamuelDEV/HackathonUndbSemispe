@@ -58,6 +58,9 @@ export function FarolHeader() {
           <Link href="/cursos" className="hover:text-[#0162A7] transition-colors py-2">
             Cursos
           </Link>
+          <Link href="/newsletter" className="hover:text-[#0162A7] transition-colors py-2">
+            Newsletter
+          </Link>
           <Link
             href={usuario ? rotaPainel : '/entrar?next=/painel'}
             className="hover:text-[#0162A7] transition-colors py-2"
@@ -116,6 +119,9 @@ export function FarolHeader() {
           </Link>
           <Link href="/cursos" onClick={() => setMenuAberto(false)} className="block py-3 font-semibold border-b border-[#F3F8FC]">
             Cursos
+          </Link>
+          <Link href="/newsletter" onClick={() => setMenuAberto(false)} className="block py-3 font-semibold border-b border-[#F3F8FC]">
+            Newsletter & Eventos
           </Link>
           <Link href={usuario ? rotaPainel : '/entrar'} onClick={() => setMenuAberto(false)} className="block py-3 font-semibold border-b border-[#F3F8FC]">
             Meu Currículo

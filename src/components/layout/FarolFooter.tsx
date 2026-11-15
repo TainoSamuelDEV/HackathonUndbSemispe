@@ -21,6 +21,7 @@ export function FarolFooter() {
           <ul className="space-y-2 text-sm text-slate-300">
             <li><Link href="/vagas" className="hover:text-[#FADC00]">Catálogo de Vagas</Link></li>
             <li><Link href="/cursos" className="hover:text-[#FADC00]">Cursos SEMISPE</Link></li>
+            <li><Link href="/newsletter" className="hover:text-[#FADC00]">Newsletter · Editais & Eventos</Link></li>
             <li><Link href="/sobre" className="hover:text-[#FADC00]">Sobre o Programa</Link></li>
             <li><Link href="/entrar" className="hover:text-[#FADC00]">Acessar Conta</Link></li>
           </ul>
