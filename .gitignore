@@ -12,3 +12,14 @@ __pycache__/
 *.py[cod]
 .vscode/
 .idea/
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.env
+.DS_Store
+node_modules/
+data/*.db
+*.db-shm
+*.db-wal
+coverage/

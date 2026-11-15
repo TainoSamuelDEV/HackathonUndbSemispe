@@ -1,0 +1,12 @@
+services:
+  portal:
+    build: .
+    ports:
+      - '8000:8000'
+    volumes:
+      - conecta_data:/app/data
+    environment:
+      - HOST=0.0.0.0
+      - DATABASE_PATH=/app/data/conecta.db
+volumes:
+  conecta_data:
