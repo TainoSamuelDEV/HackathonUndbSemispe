@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { CursoRecord } from '@/server/infrastructure/repositories/FarolDataStore';
+import { CursoCard } from '@/components/cards/CursoCard';
 
 export default function CursosPage() {
   const [cursos, setCursos] = useState<CursoRecord[]>([]);
@@ -54,30 +55,7 @@ export default function CursosPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {cursos.map((curso) => (
-          <div key={curso.id} className="border border-[#DCE7EF] rounded-[16px] p-6 bg-white flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <span
-                  className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-                    curso.tipo === 'PROGRAMADO'
-                      ? 'bg-[#EAF7F0] text-[#0A7B36]'
-                      : 'bg-[#F3F5F8] text-[#64758A]'
-                  }`}
-                >
-                  {curso.tipo === 'PROGRAMADO' ? 'Turma programada' : 'Sob demanda (sem data)'}
-                </span>
-                <span className="text-xs font-bold text-[#66788A]">{curso.cargaHoraria}h</span>
-              </div>
-              <h2 className="font-heading text-xl font-bold text-[#0B2540] mb-1">{curso.titulo}</h2>
-              <p className="text-xs font-semibold text-[#66788A] mb-3">{curso.instituicao}</p>
-              <p className="text-sm text-[#66788A] mb-4">{curso.descricao}</p>
-            </div>
-            <div className="text-xs text-[#0162A7] font-bold">
-              {curso.turmas.length > 0
-                ? `Turma ${curso.turmas[0].codigoTurma} · ${curso.turmas[0].localBairro}`
-                : 'Aguardando formação de demanda'}
-            </div>
-          </div>
+          <CursoCard key={curso.id} curso={curso} />
         ))}
       </div>
 

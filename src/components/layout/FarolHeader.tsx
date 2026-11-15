@@ -90,7 +90,7 @@ export function FarolHeader() {
           ) : (
             <Link
               href="/entrar"
-              className="inline-flex items-center justify-center min-h-[44px] px-5 rounded-[12px] bg-[#FADC00] text-[#0B2540] text-sm font-bold hover:bg-[#E8CB00] transition-colors"
+              className="inline-flex items-center justify-center min-h-[42px] px-6 rounded-full bg-[#FADC00] text-[#0B2540] text-sm font-bold hover:bg-[#E8CB00] transition-colors"
             >
               Entrar
             </Link>
