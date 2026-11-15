@@ -112,7 +112,10 @@ export class GeminiClient {
       ],
       generationConfig: {
         temperature: input.temperature ?? 0.3,
-        maxOutputTokens: input.maxOutputTokens ?? 320,
+        maxOutputTokens: input.maxOutputTokens ?? 1024,
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
       },
     });
   }
@@ -140,7 +143,10 @@ export class GeminiClient {
       ],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 500,
+        maxOutputTokens: 1024,
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
       },
     });
   }
