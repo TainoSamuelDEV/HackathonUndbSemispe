@@ -1,7 +1,9 @@
 import { farolService } from '@/server/application/FarolService';
 import { isGeminiConfigured } from '@/server/config/env';
 import { normalizarTelefoneWhatsApp, sanitizarEntradaCidadao } from '@/server/domain/ai/Guardrails';
+import { calcularCompatibilidade } from '@/server/domain/matching/MatchEngine';
 import { geminiClient } from '@/server/infrastructure/ai/GeminiClient';
+import type { NivelEscolaridade } from '@/types/farol';
 
 export interface MensagemEntradaWhatsApp {
   telefoneRaw: string;
@@ -22,11 +24,39 @@ const FAROL_SYSTEM_PROMPT = [
   'Você é a assistente virtual do FAROL (Formação, Ações e Rede de Oportunidades Locais), da Prefeitura de São Luís e SEMISPE.',
   'Regras obrigatórias:',
   '- Responda em português brasileiro simples, acolhedor e respeitoso (sem jargões).',
-  '- Seja muito concisa para WhatsApp: no máximo 3 a 4 linhas curtas e faça apenas 1 pergunta por vez.',
+  '- Seja concisa para WhatsApp (no máximo 4 a 6 linhas curtas) e conclua SEMPRE a frase/pergunta por completo.',
+  '- Não repita "Olá" se a conversa já estiver em andamento.',
   '- Use EXCLUSIVAMENTE os fatos, vagas, cursos e percentuais presentes em CONTEXTO_REAL_SISTEMA.',
   '- Nunca invente vagas, empresas, cursos, links ou prazos. Nunca prometa emprego garantido.',
   '- Nunca peça nem repita número de CPF ou RG.',
 ].join('\n');
+
+function parseEscolaridade(textoNorm: string): {
+  codigo: NivelEscolaridade;
+  label: string;
+} | null {
+  if (textoNorm === '1' || textoNorm.includes('fundamental')) {
+    return { codigo: 'FUNDAMENTAL_COMPLETO', label: 'Fundamental completo' };
+  }
+  if (textoNorm === '2' || textoNorm.includes('medio') || textoNorm.includes('médio')) {
+    return { codigo: 'MEDIO_COMPLETO', label: 'Médio completo' };
+  }
+  if (textoNorm === '3' || textoNorm.includes('tecnico') || textoNorm.includes('técnico')) {
+    return { codigo: 'TECNICO', label: 'Técnico' };
+  }
+  if (textoNorm === '4' || textoNorm.includes('superior') || textoNorm.includes('faculdade')) {
+    return { codigo: 'SUPERIOR_COMPLETO', label: 'Superior' };
+  }
+  return null;
+}
+
+function extrairListaHabilidades(textoLimpo: string): string[] {
+  return textoLimpo
+    .split(/[,;\n]+|\se\s/i)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 2)
+    .slice(0, 12);
+}
 
 /**
  * Orquestrador da IA FAROL (WhatsApp via Evolution API).
@@ -51,6 +81,93 @@ export class FarolOrchestrator {
     } catch {
       return fallbackTexto;
     }
+  }
+
+  private async responderComVagasECursosPorPerfil(
+    telefone: string,
+    textoLimpo: string,
+    textoNorm: string,
+    escolaridadeCodigo: NivelEscolaridade,
+    habilidades: string[]
+  ): Promise<RespostaFarolAI> {
+    if (textoNorm.includes('curso') || textoNorm === '2') {
+      const cursos = await farolService.listarCursos();
+      const top = cursos.slice(0, 3);
+      const lista = top
+        .map(
+          (c, idx) =>
+            `${idx + 1}) ${c.titulo} (${c.cargaHoraria}h · ${c.tipo === 'PROGRAMADO' ? 'Turma aberta' : 'Sob demanda'})`
+        )
+        .join('\n');
+
+      const fallback = `Encontrei estes cursos gratuitos da SEMISPE:\n${lista}\nQuer saber mais sobre algum curso ou ver vagas?`;
+      const respostaTexto = await this.redigirComGemini(textoLimpo, fallback, {
+        acao: 'listar_cursos_semispe',
+        cursos: top.map((c, idx) => ({
+          numero: idx + 1,
+          titulo: c.titulo,
+          cargaHoraria: c.cargaHoraria,
+          tipo: c.tipo,
+        })),
+      });
+
+      await farolService.atualizarEstadoConversaWhatsApp(telefone, 'CURSOS');
+      return { telefone, estadoAtual: 'CURSOS', respostaTexto };
+    }
+
+    const vagas = await farolService.listarVagasPublicas();
+    const avaliadas = vagas
+      .map((vaga) => ({
+        vaga,
+        match: calcularCompatibilidade(
+          {
+            escolaridade: escolaridadeCodigo,
+            competencias: habilidades,
+          },
+          {
+            escolaridadeMinima: vaga.escolaridadeMinima,
+            requisitos: vaga.requisitos,
+          }
+        ),
+      }))
+      .sort((a, b) => b.match.percentual - a.match.percentual)
+      .slice(0, 3);
+
+    if (avaliadas.length === 0) {
+      const fallback =
+        'No momento não encontrei vagas abertas para o seu perfil. Quer ver os cursos gratuitos da SEMISPE? Responda CURSOS.';
+      const respostaTexto = await this.redigirComGemini(textoLimpo, fallback, {
+        acao: 'sem_vagas_abertas_sugerir_cursos',
+      });
+      await farolService.atualizarEstadoConversaWhatsApp(telefone, 'CURSOS');
+      return { telefone, estadoAtual: 'CURSOS', respostaTexto };
+    }
+
+    const linhasVagas = avaliadas.map(({ vaga, match }, idx) => {
+      const atende = match.atendidos.slice(0, 2).join(', ') || 'Perfil inicial';
+      const falta = match.naoIdentificados.slice(0, 1).map((f) => f.item).join(', ');
+      const selo = vaga.seloSimulado ? ' [Exemplo]' : '';
+      return `${idx + 1}) ${vaga.titulo}${selo} — ${match.percentual}% compatível\n✅ Atende: ${atende}${falta ? `\n📌 Falta: ${falta}` : ''}`;
+    });
+
+    await farolService.atualizarEstadoConversaWhatsApp(telefone, 'MATCH', {
+      ultimasVagasSugeridas: avaliadas.map((m) => m.vaga.id),
+    });
+
+    const fallback = `Encontrei ${avaliadas.length} vagas para o seu perfil:\n\n${linhasVagas.join('\n\n')}\n\nResponda 2 para ver cursos gratuitos da SEMISPE ou ATENDENTE para falar com a equipe.`;
+    const respostaTexto = await this.redigirComGemini(textoLimpo, fallback, {
+      acao: 'apresentar_vagas_match',
+      vagas: avaliadas.map(({ vaga, match }, idx) => ({
+        numero: idx + 1,
+        titulo: vaga.titulo,
+        seloExemplo: Boolean(vaga.seloSimulado),
+        compatibilidadePercentual: match.percentual,
+        atende: match.atendidos.slice(0, 2),
+        falta: match.naoIdentificados.slice(0, 1).map((f) => f.item),
+      })),
+    });
+
+    return { telefone, estadoAtual: 'MATCH', respostaTexto };
   }
 
   async processarMensagem(entrada: MensagemEntradaWhatsApp): Promise<RespostaFarolAI> {
@@ -108,15 +225,26 @@ export class FarolOrchestrator {
           habilidades: extraido.habilidades.slice(0, 8),
         };
 
+        const escolaridadeDetectada = extraido.escolaridade
+          ? parseEscolaridade(extraido.escolaridade.toLowerCase())
+          : null;
+
         await farolService.atualizarEstadoConversaWhatsApp(telefone, 'CURRICULO', {
           curriculoExtraido: resumoCurriculo,
           ...(extraido.nome ? { nome: extraido.nome } : {}),
           ...(extraido.bairro ? { bairro: extraido.bairro } : {}),
+          ...(escolaridadeDetectada
+            ? {
+                escolaridade: escolaridadeDetectada.label,
+                escolaridadeCodigo: escolaridadeDetectada.codigo,
+              }
+            : {}),
+          ...(extraido.habilidades.length > 0 ? { habilidades: extraido.habilidades.slice(0, 12) } : {}),
         });
 
         const fallback =
           `Li seu currículo! Encontrei: ${extraido.nome ?? 'Nome não identificado'}, ` +
-          `habilidades: ${habilidadesTexto}.\nEstá tudo certo? Responda 1 para SIM ou me diga o que corrigir.`;
+          `habilidades: ${habilidadesTexto}.\nEstá tudo certo? Responda VAGAS para ver oportunidades ou me diga o que corrigir.`;
 
         const respostaTexto = await this.redigirComGemini(
           'O cidadão enviou um currículo em arquivo. Resuma o que foi extraído e peça confirmação.',
@@ -211,7 +339,7 @@ export class FarolOrchestrator {
       };
     }
 
-    // 2. Match / Consulta de Vagas e Cursos para candidato vinculado
+    // 2. Match / Consulta de Vagas e Cursos para candidato já vinculado no banco
     if (conv.candidatoId) {
       if (textoNorm.includes('curso') || textoNorm === '2') {
         const cursos = await farolService.listarCursos();
@@ -287,8 +415,8 @@ export class FarolOrchestrator {
       };
     }
 
-    // 3. Triagem simplificada para usuário ainda não vinculado
-    const nome = String(conv.contextoJson.nome ?? '');
+    // 3. Triagem sequencial para cidadão via WhatsApp (nome -> bairro -> escolaridade -> habilidades -> match)
+    const nome = String(conv.contextoJson.nome ?? '').trim();
     if (!nome) {
       await farolService.atualizarEstadoConversaWhatsApp(telefone, 'TRIAGEM', { nome: textoLimpo });
       const fallback = `Prazer, ${textoLimpo}! Em qual bairro de São Luís você mora?`;
@@ -304,23 +432,94 @@ export class FarolOrchestrator {
       };
     }
 
-    await farolService.atualizarEstadoConversaWhatsApp(telefone, 'CURRICULO', {
-      bairro: textoLimpo,
-    });
+    const bairro = String(conv.contextoJson.bairro ?? '').trim();
+    if (!bairro) {
+      await farolService.atualizarEstadoConversaWhatsApp(telefone, 'CURRICULO', {
+        bairro: textoLimpo,
+      });
 
-    const fallback = `Anotado, ${nome} (${textoLimpo})! Qual é a sua escolaridade?\n1) Fundamental 2) Médio completo 3) Técnico 4) Superior`;
-    const respostaTexto = await this.redigirComGemini(textoLimpo, fallback, {
-      acao: 'perguntar_escolaridade',
-      nomeCidadao: nome,
-      bairro: textoLimpo,
-      opcoesEscolaridade: ['1) Fundamental', '2) Médio completo', '3) Técnico', '4) Superior'],
-    });
+      const fallback = `Anotado, ${nome} (${textoLimpo})! Qual é a sua escolaridade?\n1) Fundamental\n2) Médio completo\n3) Técnico\n4) Superior`;
+      const respostaTexto = await this.redigirComGemini(textoLimpo, fallback, {
+        acao: 'perguntar_escolaridade',
+        nomeCidadao: nome,
+        bairro: textoLimpo,
+        opcoesEscolaridade: ['1) Fundamental', '2) Médio completo', '3) Técnico', '4) Superior'],
+      });
 
-    return {
+      return {
+        telefone,
+        estadoAtual: 'CURRICULO',
+        respostaTexto,
+      };
+    }
+
+    const escolaridadeCodigo = conv.contextoJson.escolaridadeCodigo as NivelEscolaridade | undefined;
+    if (!escolaridadeCodigo) {
+      const parsed = parseEscolaridade(textoNorm);
+      if (!parsed) {
+        return {
+          telefone,
+          estadoAtual: 'CURRICULO',
+          respostaTexto:
+            'Não entendi sua escolaridade. Por favor, responda apenas com o número:\n1) Fundamental\n2) Médio completo\n3) Técnico\n4) Superior',
+        };
+      }
+
+      await farolService.atualizarEstadoConversaWhatsApp(telefone, 'CURRICULO', {
+        escolaridade: parsed.label,
+        escolaridadeCodigo: parsed.codigo,
+      });
+
+      const fallback = `Perfeito, ${nome}! Escolaridade: ${parsed.label}. Agora me conte: quais são suas principais habilidades ou experiências de trabalho? (Ex: vendas, caixa, atendimento, informática)`;
+      const respostaTexto = await this.redigirComGemini(textoLimpo, fallback, {
+        acao: 'perguntar_habilidades_experiencia',
+        nomeCidadao: nome,
+        bairro,
+        escolaridade: parsed.label,
+      });
+
+      return {
+        telefone,
+        estadoAtual: 'CURRICULO',
+        respostaTexto,
+      };
+    }
+
+    const habilidadesSalvas = Array.isArray(conv.contextoJson.habilidades)
+      ? (conv.contextoJson.habilidades as string[])
+      : [];
+
+    if (habilidadesSalvas.length === 0) {
+      const habilidades = extrairListaHabilidades(textoLimpo);
+      if (habilidades.length === 0) {
+        return {
+          telefone,
+          estadoAtual: 'CURRICULO',
+          respostaTexto:
+            'Pode me dizer pelo menos uma área ou habilidade que você tem? (Ex: atendimento, estoque, entregas, limpeza, informática)',
+        };
+      }
+
+      await farolService.atualizarEstadoConversaWhatsApp(telefone, 'MATCH', {
+        habilidades,
+      });
+
+      return this.responderComVagasECursosPorPerfil(
+        telefone,
+        textoLimpo,
+        textoNorm,
+        escolaridadeCodigo,
+        habilidades
+      );
+    }
+
+    return this.responderComVagasECursosPorPerfil(
       telefone,
-      estadoAtual: 'CURRICULO',
-      respostaTexto,
-    };
+      textoLimpo,
+      textoNorm,
+      escolaridadeCodigo,
+      habilidadesSalvas
+    );
   }
 }
 
