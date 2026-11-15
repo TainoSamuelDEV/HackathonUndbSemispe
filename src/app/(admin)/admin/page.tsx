@@ -69,23 +69,23 @@ export default function PainelAdminSemispePage() {
         ))}
       </div>
 
-      <div className="border border-[#DCE7EF] rounded-[16px] p-6 bg-white space-y-4">
-        <h2 className="font-heading text-xl font-bold text-[#0B2540]">
+      <div className="border border-[#DCE7EF] rounded-[16px] p-4 sm:p-6 bg-white space-y-4">
+        <h2 className="font-heading text-lg sm:text-xl font-bold text-[#0B2540]">
           Ranking de Demanda por Novos Cursos (Portal + WhatsApp)
         </h2>
         <div className="space-y-3">
           {dados.rankingPedidos.map((item, idx) => (
             <div
               key={idx}
-              className="border border-[#DCE7EF] rounded-[12px] p-4 flex items-center justify-between"
+              className="border border-[#DCE7EF] rounded-[12px] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
             >
-              <div>
-                <strong className="text-sm text-[#0B2540]">{item.tema}</strong>
+              <div className="min-w-0">
+                <strong className="text-sm text-[#0B2540] break-words">{item.tema}</strong>
                 <p className="text-xs text-[#66788A]">
                   Bairros interessados: {item.bairros.join(', ') || 'Não informado'}
                 </p>
               </div>
-              <span className="font-heading font-extrabold text-lg text-[#0A7B36]">
+              <span className="font-heading font-extrabold text-base sm:text-lg text-[#0A7B36] shrink-0">
                 {item.totalPedidos} {item.totalPedidos === 1 ? 'pedido' : 'pedidos'}
               </span>
             </div>

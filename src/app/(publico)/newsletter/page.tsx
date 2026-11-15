@@ -289,9 +289,9 @@ export default function NewsletterPage() {
   }, [categoria, buscaNorm]);
 
   return (
-    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-10 space-y-12">
+    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 sm:space-y-12">
       {/* HERO DA NEWSLETTER */}
-      <section className="relative overflow-hidden rounded-[24px] bg-[#0B2540] text-white p-7 sm:p-10 shadow-sm">
+      <section className="relative overflow-hidden rounded-[20px] sm:rounded-[24px] bg-[#0B2540] text-white p-5 sm:p-10 shadow-sm">
         <div className="absolute -right-20 -top-20 w-72 h-72 rounded-full bg-[#0162A7]/35 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-24 right-24 w-64 h-64 rounded-full bg-[#0A7B36]/25 blur-2xl pointer-events-none" />
 

@@ -18,12 +18,12 @@ export default async function VagasPage({
   });
 
   return (
-    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-10">
-      <div className="mb-8">
+    <div className="max-w-[1200px] mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <div className="mb-6 sm:mb-8">
         <span className="text-xs font-extrabold uppercase tracking-wider text-[#0162A7]">
           Catálogo Público
         </span>
-        <h1 className="font-heading text-3xl sm:text-4xl font-extrabold text-[#0B2540] mt-1">
+        <h1 className="font-heading text-2xl sm:text-4xl font-extrabold text-[#0B2540] mt-1">
           Vagas de emprego e oportunidades
         </h1>
         <p className="text-sm text-[#66788A] mt-2">
@@ -33,24 +33,24 @@ export default async function VagasPage({
 
       <form
         method="GET"
-        className="bg-[#F3F8FC] border border-[#DCE7EF] rounded-[24px] p-4 mb-8 grid grid-cols-1 md:grid-cols-4 gap-3"
+        className="bg-[#F3F8FC] border border-[#DCE7EF] rounded-[20px] sm:rounded-[24px] p-3.5 sm:p-4 mb-6 sm:mb-8 grid grid-cols-1 md:grid-cols-4 gap-2.5 sm:gap-3"
       >
         <input
           name="busca"
           defaultValue={sp.busca ?? ''}
           placeholder="Cargo, área ou competência"
-          className="bg-white border border-[#DCE7EF] rounded-full px-4 py-2.5 text-sm focus:outline-none focus:border-[#0162A7]"
+          className="min-h-[44px] bg-white border border-[#DCE7EF] rounded-[12px] sm:rounded-full px-4 py-2.5 text-sm focus:outline-none focus:border-[#0162A7]"
         />
         <input
           name="bairro"
           defaultValue={sp.bairro ?? ''}
           placeholder="Bairro (ex: Itaqui-Bacanga)"
-          className="bg-white border border-[#DCE7EF] rounded-full px-4 py-2.5 text-sm focus:outline-none focus:border-[#0162A7]"
+          className="min-h-[44px] bg-white border border-[#DCE7EF] rounded-[12px] sm:rounded-full px-4 py-2.5 text-sm focus:outline-none focus:border-[#0162A7]"
         />
         <select
           name="modalidade"
           defaultValue={sp.modalidade ?? ''}
-          className="bg-white border border-[#DCE7EF] rounded-full px-4 py-2.5 text-sm focus:outline-none focus:border-[#0162A7]"
+          className="min-h-[44px] bg-white border border-[#DCE7EF] rounded-[12px] sm:rounded-full px-4 py-2.5 text-sm focus:outline-none focus:border-[#0162A7]"
         >
           <option value="">Todas as modalidades</option>
           <option value="PRESENCIAL">Presencial</option>
@@ -59,7 +59,7 @@ export default async function VagasPage({
         </select>
         <button
           type="submit"
-          className="min-h-[44px] rounded-full bg-[#0162A7] text-white font-bold text-sm hover:bg-[#004F8A] transition-colors"
+          className="min-h-[44px] rounded-[12px] sm:rounded-full bg-[#0162A7] text-white font-bold text-sm hover:bg-[#004F8A] transition-colors"
         >
           Filtrar vagas
         </button>

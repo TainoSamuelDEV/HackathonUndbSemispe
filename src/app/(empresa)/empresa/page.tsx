@@ -116,24 +116,24 @@ export default function PainelEmpresaPage() {
         />
         <button
           type="submit"
-          className="min-h-[44px] px-6 rounded-[12px] bg-[#0162A7] text-white font-bold text-sm"
+          className="w-full sm:w-auto min-h-[44px] px-6 rounded-[12px] bg-[#0162A7] text-white font-bold text-sm"
         >
           Publicar vaga
         </button>
         {mensagem && <p className="text-xs font-bold text-[#0A7B36]">{mensagem}</p>}
       </form>
 
-      <div className="border border-[#DCE7EF] rounded-[16px] p-6 bg-white space-y-3">
+      <div className="border border-[#DCE7EF] rounded-[16px] p-4 sm:p-6 bg-white space-y-3">
         <h2 className="font-heading text-xl font-bold text-[#0B2540]">Minhas Vagas Publicadas</h2>
         {vagas.map((v) => (
-          <div key={v.id} className="border border-[#DCE7EF] rounded-[12px] p-4 flex justify-between items-center">
-            <div>
-              <strong className="text-sm text-[#0B2540]">{v.titulo}</strong>
+          <div key={v.id} className="border border-[#DCE7EF] rounded-[12px] p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+            <div className="min-w-0">
+              <strong className="text-sm text-[#0B2540] break-words">{v.titulo}</strong>
               <p className="text-xs text-[#66788A]">
                 {v.bairro} · {v.modalidade}
               </p>
             </div>
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#EAF7F0] text-[#0A7B36]">
+            <span className="self-start sm:self-auto text-xs font-bold px-3 py-1 rounded-full bg-[#EAF7F0] text-[#0A7B36] shrink-0">
               {v.status}
             </span>
           </div>

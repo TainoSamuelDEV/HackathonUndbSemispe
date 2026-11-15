@@ -163,10 +163,10 @@ export default async function HomePage() {
       </section>
 
       {/* BLOCO AZUL ARREDONDADO — CARDS ESCALONADOS COM CLIPE */}
-      <section className="max-w-[1200px] mx-auto px-4 sm:px-6 pb-16">
-        <div className="bg-[#0162A7] rounded-[32px] p-6 sm:p-10 lg:p-12">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
-            <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-white leading-tight">
+      <section className="max-w-[1200px] mx-auto px-4 sm:px-6 pb-10 sm:pb-16">
+        <div className="bg-[#0162A7] rounded-[24px] sm:rounded-[32px] p-5 sm:p-10 lg:p-12">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 sm:gap-4 mb-7 sm:mb-10">
+            <h2 className="font-heading text-2xl sm:text-4xl font-extrabold text-white leading-tight">
               Caminhos no
               <br />
               ecossistema FAROL
@@ -176,7 +176,7 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 items-start">
             {[
               {
                 titulo: 'Procuro emprego',
@@ -216,7 +216,7 @@ export default async function HomePage() {
                 <Link
                   key={item.titulo}
                   href={item.href}
-                  className={`relative bg-white rounded-[22px] p-5 shadow-md hover:-translate-y-1 transition-all flex flex-col justify-between min-h-[210px] ${item.offset}`}
+                  className={`relative bg-white rounded-[20px] sm:rounded-[22px] p-5 shadow-md hover:-translate-y-1 transition-all flex flex-col justify-between min-h-[165px] sm:min-h-[210px] ${item.offset}`}
                 >
                   <Paperclip
                     aria-hidden="true"
