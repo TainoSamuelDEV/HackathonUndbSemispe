@@ -155,6 +155,10 @@ export class GeminiClient {
    * Extrai informações estruturadas de um currículo em PDF ou imagem para revisão do candidato.
    */
   async extrairCurriculo(base64Data: string, mimeType: string): Promise<CurriculoExtraido> {
+    const cleanBase64 = base64Data.includes(',')
+      ? base64Data.split(',').pop()!.trim()
+      : base64Data.trim();
+
     const rawJson = await this.generateContent({
       contents: [
         {
@@ -177,7 +181,7 @@ export class GeminiClient {
             {
               inlineData: {
                 mimeType,
-                data: base64Data,
+                data: cleanBase64,
               },
             },
           ],
@@ -185,12 +189,21 @@ export class GeminiClient {
       ],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 2048,
         responseMimeType: 'application/json',
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
       },
     });
 
-    const parsed = JSON.parse(rawJson) as Partial<CurriculoExtraido>;
+    const sanitizedJson = rawJson
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```$/i, '')
+      .trim();
+
+    const parsed = JSON.parse(sanitizedJson) as Partial<CurriculoExtraido>;
     return {
       nome: typeof parsed.nome === 'string' && parsed.nome.trim() ? parsed.nome.trim() : undefined,
       bairro: typeof parsed.bairro === 'string' && parsed.bairro.trim() ? parsed.bairro.trim() : undefined,

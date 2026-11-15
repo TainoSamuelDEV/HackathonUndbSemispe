@@ -257,7 +257,8 @@ export class FarolOrchestrator {
           estadoAtual: 'CURRICULO',
           respostaTexto,
         };
-      } catch {
+      } catch (err) {
+        console.error('[FarolOrchestrator] Erro ao extrair currículo:', err);
         return {
           telefone,
           estadoAtual: conv.estadoAtual,

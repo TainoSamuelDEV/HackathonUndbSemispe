@@ -59,7 +59,12 @@ export async function POST(req: NextRequest) {
     let documentoMimeType: string | undefined;
 
     const evo = env.EVOLUTION_API_URL && env.EVOLUTION_API_KEY ? new EvolutionClient() : null;
-    const inlineBase64: string | undefined = message?.base64 ?? data?.base64;
+    const inlineBase64: string | undefined =
+      message?.base64 ??
+      data?.base64 ??
+      audioMsg?.base64 ??
+      documentMsg?.base64 ??
+      imageMsg?.base64;
 
     if (audioMsg) {
       audioMimeType = String(audioMsg.mimetype ?? 'audio/ogg').split(';')[0].trim();
