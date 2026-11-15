@@ -52,32 +52,32 @@ export default async function HomePage() {
           className="absolute -bottom-24 right-0 w-96 h-96 rounded-full bg-[#FADC00]/15 blur-3xl pointer-events-none"
         />
 
-        <div className="relative z-10 max-w-[1200px] mx-auto px-4 sm:px-6 pt-12 pb-16 lg:pt-16 lg:pb-24">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
-            <div className="lg:col-span-7 space-y-6">
-              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-xs font-bold text-[#FADC00]">
+        <div className="relative z-10 max-w-[1200px] mx-auto px-4 sm:px-6 pt-7 pb-8 sm:pt-12 sm:pb-14 lg:pt-16 lg:pb-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div className="lg:col-span-7 space-y-4 sm:space-y-6">
+              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-[11px] sm:text-xs font-bold text-[#FADC00]">
                 <Sparkles className="w-3.5 h-3.5" />
                 SEMISPE · Parque Tecnológico de São Luís
               </span>
 
-              <h1 className="font-heading text-4xl sm:text-5xl lg:text-[54px] font-extrabold text-white leading-[1.06] tracking-tight drop-shadow-sm">
+              <h1 className="font-heading text-[28px] sm:text-5xl lg:text-[54px] font-extrabold text-white leading-[1.1] tracking-tight drop-shadow-sm">
                 Seu futuro ganha direção quando{' '}
                 <span className="text-[#FADC00]">conhecimento e oportunidade</span> se encontram.
               </h1>
 
-              <p className="text-base sm:text-lg text-slate-100 max-w-[580px] leading-relaxed">
+              <p className="text-sm sm:text-lg text-slate-100 max-w-[580px] leading-relaxed">
                 O <strong>FAROL</strong> conecta moradores de São Luís — com prioridade no eixo{' '}
                 <strong>Itaqui-Bacanga</strong> — a vagas reais, cursos gratuitos da SEMISPE,
                 eventos de startups e atendimento direto pelo WhatsApp.
               </p>
 
-              {/* Busca rápida compacta + CTA pill com seta circular */}
+              {/* Busca rápida: retângulo arredondado no mobile, pill no desktop */}
               <form
                 action="/vagas"
                 method="GET"
-                className="bg-white/95 backdrop-blur-md p-2 rounded-full border border-white/40 shadow-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-[560px]"
+                className="bg-white/95 backdrop-blur-md p-2.5 sm:p-2 rounded-[20px] sm:rounded-full border border-white/40 shadow-xl flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-[560px]"
               >
-                <div className="flex-1 flex items-center gap-2 pl-4 pr-2">
+                <div className="flex-1 flex items-center gap-2.5 px-3 sm:pl-4 sm:pr-2">
                   <Search className="w-4 h-4 text-[#0162A7] shrink-0" />
                   <input
                     name="busca"
@@ -87,33 +87,33 @@ export default async function HomePage() {
                 </div>
                 <button
                   type="submit"
-                  className="inline-flex items-center justify-center gap-2 min-h-[44px] pl-5 pr-2 rounded-full bg-[#0162A7] text-white text-sm font-bold hover:bg-[#004F8A] transition-colors"
+                  className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 sm:pl-5 sm:pr-2 rounded-[14px] sm:rounded-full bg-[#0162A7] text-white text-sm font-bold hover:bg-[#004F8A] transition-colors"
                 >
                   <span>Encontrar vagas</span>
-                  <span className="w-8 h-8 rounded-full bg-[#FADC00] text-[#0B2540] flex items-center justify-center">
+                  <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#FADC00] text-[#0B2540] flex items-center justify-center">
                     <ArrowRight className="w-4 h-4" />
                   </span>
                 </button>
               </form>
 
-              <div className="flex flex-wrap items-center gap-3 pt-1">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-1">
                 <Link
                   href="/cursos"
-                  className="inline-flex items-center gap-2 min-h-[42px] px-5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-sm font-bold text-white hover:bg-white/25 transition-colors"
+                  className="inline-flex items-center gap-1.5 min-h-[38px] sm:min-h-[42px] px-3.5 sm:px-5 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-xs sm:text-sm font-bold text-white hover:bg-white/25 transition-colors"
                 >
                   <GraduationCap className="w-4 h-4 text-[#FADC00]" />
                   Conhecer cursos
                 </Link>
                 <Link
                   href="/newsletter"
-                  className="inline-flex items-center gap-2 min-h-[42px] px-5 rounded-full bg-[#0A7B36]/85 backdrop-blur-md border border-[#93C05F]/40 text-sm font-bold text-white hover:bg-[#0A7B36] transition-colors"
+                  className="inline-flex items-center gap-1.5 min-h-[38px] sm:min-h-[42px] px-3.5 sm:px-5 rounded-full bg-[#0A7B36]/85 backdrop-blur-md border border-[#93C05F]/40 text-xs sm:text-sm font-bold text-white hover:bg-[#0A7B36] transition-colors"
                 >
                   <Sparkles className="w-4 h-4 text-[#FADC00]" />
                   Editais & Eventos SLZ
                 </Link>
                 <Link
                   href="/entrar"
-                  className="inline-flex items-center gap-2 min-h-[42px] px-5 rounded-full bg-[#FADC00] text-sm font-bold text-[#0B2540] hover:bg-[#E8CB00] transition-colors"
+                  className="inline-flex items-center gap-1.5 min-h-[38px] sm:min-h-[42px] px-3.5 sm:px-5 rounded-full bg-[#FADC00] text-xs sm:text-sm font-bold text-[#0B2540] hover:bg-[#E8CB00] transition-colors"
                 >
                   <MessageCircle className="w-4 h-4" />
                   Criar currículo com IA
@@ -121,8 +121,8 @@ export default async function HomePage() {
               </div>
             </div>
 
-            {/* Lado direito — Card Glassmorphism flutuante sobre o vídeo */}
-            <div className="lg:col-span-5 relative flex justify-center lg:justify-end py-4">
+            {/* Lado direito — Card Glassmorphism flutuante sobre o vídeo (desktop) */}
+            <div className="hidden lg:flex lg:col-span-5 relative justify-end py-4">
               <div className="relative w-full max-w-[420px]">
                 <div
                   aria-hidden="true"
