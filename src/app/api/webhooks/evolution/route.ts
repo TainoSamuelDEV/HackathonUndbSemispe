@@ -8,15 +8,24 @@ import { handleApiError, ok } from '@/server/infrastructure/http/apiResponse';
 export async function POST(req: NextRequest) {
   try {
     const env = getServerEnv();
+    const payload = await req.json();
+
     if (env.EVOLUTION_WEBHOOK_SECRET) {
-      const secretHeader = req.headers.get('x-webhook-secret') ?? req.headers.get('apikey');
-      if (secretHeader !== env.EVOLUTION_WEBHOOK_SECRET) {
+      const providedSecret =
+        req.headers.get('x-webhook-secret') ??
+        req.headers.get('apikey') ??
+        req.headers.get('x-api-key') ??
+        req.nextUrl.searchParams.get('secret') ??
+        (typeof payload?.apikey === 'string' ? payload.apikey : null);
+
+      if (providedSecret !== env.EVOLUTION_WEBHOOK_SECRET) {
         throw new AcessoNegadoError('Webhook Evolution não autorizado.');
       }
     }
 
-    const payload = await req.json();
-    const event = payload?.event;
+    const event = String(payload?.event ?? '')
+      .toLowerCase()
+      .replace(/_/g, '.');
     if (event !== 'messages.upsert') {
       return ok({ ignorado: true, motivo: 'Evento não processado' });
     }
