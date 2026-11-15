@@ -27,23 +27,71 @@ export async function POST(req: NextRequest) {
     }
 
     const remoteJid: string = data?.key?.remoteJid ?? '';
+    const message = data?.message ?? {};
     const texto: string =
-      data?.message?.conversation ??
-      data?.message?.extendedTextMessage?.text ??
+      message?.conversation ??
+      message?.extendedTextMessage?.text ??
+      message?.imageMessage?.caption ??
+      message?.documentMessage?.caption ??
       '';
 
-    if (!remoteJid || !texto) {
-      return ok({ ignorado: true, motivo: 'Sem texto processável' });
+    const audioMsg = message?.audioMessage;
+    const documentMsg =
+      message?.documentMessage ?? message?.documentWithCaptionMessage?.message?.documentMessage;
+    const imageMsg = message?.imageMessage;
+
+    if (!remoteJid || (!texto && !audioMsg && !documentMsg && !imageMsg)) {
+      return ok({ ignorado: true, motivo: 'Sem texto ou mídia processável' });
+    }
+
+    let audioBase64: string | undefined;
+    let audioMimeType: string | undefined;
+    let documentoBase64: string | undefined;
+    let documentoMimeType: string | undefined;
+
+    const evo = env.EVOLUTION_API_URL && env.EVOLUTION_API_KEY ? new EvolutionClient() : null;
+    const inlineBase64: string | undefined = message?.base64 ?? data?.base64;
+
+    if (audioMsg) {
+      audioMimeType = String(audioMsg.mimetype ?? 'audio/ogg').split(';')[0].trim();
+      if (inlineBase64) {
+        audioBase64 = inlineBase64;
+      } else if (evo && data?.key?.id) {
+        const media = await evo.obterMediaBase64(data.key);
+        audioBase64 = media.base64;
+        if (media.mimetype) {
+          audioMimeType = media.mimetype.split(';')[0].trim();
+        }
+      }
+    } else if (documentMsg || imageMsg) {
+      const targetMsg = documentMsg ?? imageMsg;
+      documentoMimeType = String(
+        targetMsg?.mimetype ?? (documentMsg ? 'application/pdf' : 'image/jpeg')
+      )
+        .split(';')[0]
+        .trim();
+      if (inlineBase64) {
+        documentoBase64 = inlineBase64;
+      } else if (evo && data?.key?.id) {
+        const media = await evo.obterMediaBase64(data.key);
+        documentoBase64 = media.base64;
+        if (media.mimetype) {
+          documentoMimeType = media.mimetype.split(';')[0].trim();
+        }
+      }
     }
 
     const resultado = await farolOrchestrator.processarMensagem({
       telefoneRaw: remoteJid,
       texto,
+      audioBase64,
+      audioMimeType,
+      documentoBase64,
+      documentoMimeType,
     });
 
     // Envia resposta pela Evolution API quando configurada
-    if (env.EVOLUTION_API_URL && env.EVOLUTION_API_KEY) {
-      const evo = new EvolutionClient();
+    if (evo) {
       await evo.enviarTexto({
         telefone: resultado.telefone,
         texto: resultado.respostaTexto,
