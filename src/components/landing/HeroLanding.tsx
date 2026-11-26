@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowRight, ArrowUpRight, Briefcase, GraduationCap, Search } from 'lucide-react';
+import { HeroVideoBackground } from '@/components/landing/HeroVideoBackground';
 
 interface HeroLandingProps {
   totalVagas: number;
@@ -43,17 +44,8 @@ export function HeroLanding({
       <div className="relative h-[340px] sm:h-[480px] lg:h-[620px]">
         {/* Base recortada em onda pela máscara (ver .mascara-onda-hero em globals.css) */}
         <div aria-hidden="true" className="mascara-onda-hero absolute inset-0 overflow-hidden bg-[#0B2540]">
-          {/* Vídeo de fundo (pessoas conversando, se conectando e estudando) */}
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-            className="absolute inset-0 h-full w-full object-cover object-[center_35%]"
-          >
-            <source src="/videos/hero-farol.mp4" type="video/mp4" />
-          </video>
+          {/* Foto instantânea durante o carregamento + vídeo otimizado em crossfade */}
+          <HeroVideoBackground />
           {/* Leve escurecimento no topo para dar profundidade atrás do header */}
           <div className="absolute inset-0 bg-gradient-to-b from-[#0B2540]/45 via-[#0B2540]/10 to-transparent" />
         </div>
