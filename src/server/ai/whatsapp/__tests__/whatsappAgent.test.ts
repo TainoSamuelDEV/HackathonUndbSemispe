@@ -237,4 +237,111 @@ describe('whatsappAgent (Pipeline Completo)', () => {
     expect(hist[0].parts[0].text).toBe('Mensagem histórica número 1');
     expect(hist[24].parts[0].text).toBe('Mensagem histórica número 25');
   });
+
+  it('remove competência existente a pedido do usuário e regenera PDF/painel sem ressurreição', async () => {
+    const db = createFarolWhatsAppChatDb();
+    const evolution = createMockTransport();
+    const telefone = '5598997778888';
+
+    // Estado inicial: candidato já cadastrado com a competência indesejada e PDF gerado anteriormente
+    const inicial = await farolService.gerarEAnexarCurriculoPadrao({
+      telefone,
+      origemCanal: 'WHATSAPP',
+      dados: {
+        nomeCompleto: 'Taino Samuel Lima Ribeiro',
+        bairro: 'Anjo da Guarda',
+        escolaridade: 'SUPERIOR_INCOMPLETO',
+        competencias: [
+          'Atendimento via WhatsApp e Plataformas Web',
+          'Excelente comunicação verbal e escrita',
+          'Help Desk (N1/N2)',
+        ],
+      },
+      substituirPerfilCompleto: true,
+    });
+
+    await db.updateSessionState(telefone, 'CURRICULO', {
+      consentimentoLgpd: true,
+      consentimentoEm: new Date().toISOString(),
+      rascunhoCurriculo: inicial.dadosFinais,
+    });
+
+    // Simula a IA removendo a competência via tool e regerando o PDF no mesmo fluxo
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'atualizar_rascunho_curriculo',
+                      args: {
+                        removerCompetencias: ['Excelente comunicação verbal e escrita'],
+                      },
+                    },
+                  },
+                  {
+                    functionCall: {
+                      name: 'gerar_e_enviar_curriculo_pdf',
+                      args: { confirmadoUsuario: true },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: 'Pronto, Taino! Removi "Excelente comunicação verbal e escrita" e já enviei seu novo PDF atualizado.',
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      });
+
+    const outcome = await processFarolDirectInput(
+      {
+        telefoneRaw: telefone,
+        texto: 'Remova "Excelente comunicação verbal e escrita" e gere o novo PDF',
+      },
+      {
+        db,
+        evolution,
+        geminiApiKey: 'test-gemini-key',
+        fetchFn: fetchMock as unknown as typeof fetch,
+        skipDelays: true,
+      }
+    );
+
+    expect(outcome.action).toBe('replied_ai_natural');
+    expect(outcome.curriculoGerado).toBeDefined();
+    expect(evolution.enviarDocumento).toHaveBeenCalledTimes(1);
+
+    // Verifica que no banco de candidato e no novo arquivo anexado a competência foi definitivamente removida
+    const candAtualizado = await farolService.obterCandidato(inicial.candidato.id);
+    expect(candAtualizado.competencias).toEqual([
+      'Atendimento via WhatsApp e Plataformas Web',
+      'Help Desk (N1/N2)',
+    ]);
+
+    const arquivos = await farolService.listarCurriculosArquivosDoCandidato(inicial.candidato.id);
+    expect(arquivos[0].dadosExtraidosJson?.competencias).toEqual([
+      'Atendimento via WhatsApp e Plataformas Web',
+      'Help Desk (N1/N2)',
+    ]);
+  });
 });

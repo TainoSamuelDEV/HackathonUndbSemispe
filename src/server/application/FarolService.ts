@@ -12,10 +12,10 @@ import {
   normalizarTelefoneWhatsApp,
 } from '@/server/domain/ai/Guardrails';
 import {
+  aplicarEdicaoCurriculoPadrao,
   type CurriculoArquivoMetadata,
   type CurriculoArquivoRecord,
   type CurriculoPadraoData,
-  mesclarCurriculoPadrao,
   montarCurriculoDeCandidato,
   sanitizarCurriculoPadrao,
 } from '@/server/domain/curriculo/CurriculoPadrao';
@@ -969,17 +969,13 @@ export class FarolService {
         nomeCompleto,
         nomeExibicao,
         bairro,
-        escolaridade: dadosLimpos.escolaridade ?? existente.candidato.escolaridade,
-        areaInteresse: dadosLimpos.areaInteresse ?? existente.candidato.areaInteresse,
-        objetivo: dadosLimpos.objetivo ?? existente.candidato.objetivo,
-        resumoProfissional: dadosLimpos.resumoProfissional ?? existente.candidato.resumoProfissional,
-        disponibilidade: dadosLimpos.disponibilidade ?? existente.candidato.disponibilidade,
-        competencias:
-          dadosLimpos.competencias.length > 0
-            ? dadosLimpos.competencias
-            : existente.candidato.competencias,
-        experiencias:
-          experienciasMapped.length > 0 ? experienciasMapped : existente.candidato.experiencias,
+        escolaridade: dadosLimpos.escolaridade ?? null,
+        areaInteresse: dadosLimpos.areaInteresse ?? null,
+        objetivo: dadosLimpos.objetivo ?? null,
+        resumoProfissional: dadosLimpos.resumoProfissional ?? null,
+        disponibilidade: dadosLimpos.disponibilidade ?? null,
+        competencias: dadosLimpos.competencias,
+        experiencias: experienciasMapped,
       });
     }
 
@@ -1072,6 +1068,7 @@ export class FarolService {
     candidatoId?: string | null;
     telefone?: string | null;
     dados?: Partial<CurriculoPadraoData>;
+    substituirPerfilCompleto?: boolean;
     origemCanal: CanalOrigem;
   }): Promise<{
     candidato: CandidatoRecord;
@@ -1108,11 +1105,17 @@ export class FarolService {
     }
 
     const base = candidatoExistente ? montarCurriculoDeCandidato(candidatoExistente, contato) : {};
-    const dadosFinais = mesclarCurriculoPadrao(base, {
-      ...input.dados,
-      ...(contato.telefone ? { telefoneWhatsApp: contato.telefone } : {}),
-      ...(contato.email ? { email: contato.email } : {}),
-    });
+    const dadosFinais = input.substituirPerfilCompleto && input.dados
+      ? sanitizarCurriculoPadrao({
+          ...input.dados,
+          telefoneWhatsApp: input.dados.telefoneWhatsApp || contato.telefone || undefined,
+          email: input.dados.email || contato.email || undefined,
+        })
+      : aplicarEdicaoCurriculoPadrao(base, {
+          ...(input.dados ?? {}),
+          ...(contato.telefone ? { telefoneWhatsApp: contato.telefone } : {}),
+          ...(contato.email ? { email: contato.email } : {}),
+        });
 
     if (!dadosFinais.nomeCompleto) {
       throw new ValidacaoError('Informe o nome completo para gerar o currículo padrão.');
@@ -1131,11 +1134,11 @@ export class FarolService {
         nomeCompleto: dadosFinais.nomeCompleto,
         nomeExibicao: dadosFinais.nomeCompleto.split(/\s+/).slice(0, 2).join(' '),
         bairro: dadosFinais.bairro || candidatoExistente.bairro,
-        escolaridade: dadosFinais.escolaridade ?? candidatoExistente.escolaridade,
-        areaInteresse: dadosFinais.areaInteresse ?? candidatoExistente.areaInteresse,
-        objetivo: dadosFinais.objetivo ?? candidatoExistente.objetivo,
-        resumoProfissional: dadosFinais.resumoProfissional ?? candidatoExistente.resumoProfissional,
-        disponibilidade: dadosFinais.disponibilidade ?? candidatoExistente.disponibilidade,
+        escolaridade: dadosFinais.escolaridade ?? null,
+        areaInteresse: dadosFinais.areaInteresse ?? null,
+        objetivo: dadosFinais.objetivo ?? null,
+        resumoProfissional: dadosFinais.resumoProfissional ?? null,
+        disponibilidade: dadosFinais.disponibilidade ?? null,
         competencias: dadosFinais.competencias,
         experiencias: experienciasMapped,
       });

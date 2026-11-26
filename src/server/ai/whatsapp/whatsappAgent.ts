@@ -4,8 +4,10 @@ import {
   sanitizarEntradaCidadao,
 } from '@/server/domain/ai/Guardrails';
 import {
+  aplicarEdicaoCurriculoPadrao,
   calcularCompletudeCurriculo,
   type CurriculoPadraoData,
+  type EdicaoCurriculoPadrao,
   mesclarCurriculoPadrao,
   montarCurriculoDeCandidato,
   normalizarNivelEscolaridade,
@@ -829,15 +831,26 @@ async function runConversationPipeline(
     session.candidatoId = candidatoInfo.candidato.id;
   }
 
+  const hasSavedDraft = Boolean(
+    session.contextoJson.rascunhoCurriculo &&
+      typeof session.contextoJson.rascunhoCurriculo === 'object'
+  );
   let rascunhoAtual = readRascunhoFromContext(session.contextoJson);
   if (candidatoInfo?.candidato) {
-    rascunhoAtual = mesclarCurriculoPadrao(
-      montarCurriculoDeCandidato(candidatoInfo.candidato, {
-        telefone: candidatoInfo.telefoneWhatsapp ?? turn.telefone,
-        email: candidatoInfo.email,
-      }),
-      rascunhoAtual
-    );
+    const doBanco = montarCurriculoDeCandidato(candidatoInfo.candidato, {
+      telefone: candidatoInfo.telefoneWhatsapp ?? turn.telefone,
+      email: candidatoInfo.email,
+    });
+    if (hasSavedDraft) {
+      // Rascunho salvo na sessão é a fonte de verdade (evita ressuscitar itens removidos)
+      rascunhoAtual = sanitizarCurriculoPadrao({
+        ...rascunhoAtual,
+        telefoneWhatsApp: rascunhoAtual.telefoneWhatsApp || doBanco.telefoneWhatsApp,
+        email: rascunhoAtual.email || doBanco.email,
+      });
+    } else {
+      rascunhoAtual = mesclarCurriculoPadrao(doBanco, rascunhoAtual);
+    }
   }
   if (extractedCurriculoPatch) {
     rascunhoAtual = mesclarCurriculoPadrao(rascunhoAtual, extractedCurriculoPatch);
@@ -852,12 +865,15 @@ async function runConversationPipeline(
     Boolean(session.contextoJson.consentimentoLgpd) ||
     Boolean(session.contextoJson.consentimentoEm) ||
     Boolean(candidatoInfo?.candidato?.consentimentoLgpd) ||
-    session.estadoAtual !== 'NOVO' && session.estadoAtual !== 'CONSENTIMENTO';
+    (session.estadoAtual !== 'NOVO' && session.estadoAtual !== 'CONSENTIMENTO');
 
-  const cidadaoNomePrimeiro =
+  const rawPrimeiroNome =
     (rascunhoAtual.nomeCompleto || candidatoInfo?.candidato?.nomeExibicao || '')
       .trim()
-      .split(/\s+/)[0] || null;
+      .split(/\s+/)[0] || '';
+  const cidadaoNomePrimeiro = rawPrimeiroNome
+    ? rawPrimeiroNome.charAt(0).toUpperCase() + rawPrimeiroNome.slice(1).toLowerCase()
+    : null;
 
   const isAwaitingHandoff = session.topicoAtual === 'aguardando_confirmacao_humano';
 
@@ -1018,35 +1034,67 @@ async function runConversationPipeline(
           erro: 'Consentimento LGPD ainda não foi confirmado pelo cidadão.',
         };
       }
-      const patch = sanitizarCurriculoPadrao({
-        nomeCompleto: typeof args.nomeCompleto === 'string' ? args.nomeCompleto : undefined,
-        bairro: typeof args.bairro === 'string' ? args.bairro : undefined,
-        municipio: typeof args.municipio === 'string' ? args.municipio : undefined,
-        email: typeof args.email === 'string' ? args.email : undefined,
-        escolaridade: normalizarNivelEscolaridade(
-          typeof args.escolaridade === 'string' ? args.escolaridade : undefined
-        ),
-        escolaridadeTexto: typeof args.escolaridade === 'string' ? args.escolaridade : undefined,
-        areaInteresse: typeof args.areaInteresse === 'string' ? args.areaInteresse : undefined,
-        objetivo: typeof args.objetivo === 'string' ? args.objetivo : undefined,
-        resumoProfissional:
-          typeof args.resumoProfissional === 'string' ? args.resumoProfissional : undefined,
-        disponibilidade: typeof args.disponibilidade === 'string' ? args.disponibilidade : undefined,
-        competencias: Array.isArray(args.competencias)
-          ? args.competencias.filter((c): c is string => typeof c === 'string')
-          : [],
-        experiencias: Array.isArray(args.experiencias)
-          ? (args.experiencias as CurriculoPadraoData['experiencias'])
-          : [],
-        cursosCertificacoes: Array.isArray(args.cursosCertificacoes)
-          ? (args.cursosCertificacoes as CurriculoPadraoData['cursosCertificacoes'])
-          : [],
-        observacoesAdicionais: Array.isArray(args.observacoesAdicionais)
-          ? args.observacoesAdicionais.filter((o): o is string => typeof o === 'string')
-          : [],
-      });
 
-      rascunhoAtual = mesclarCurriculoPadrao(rascunhoAtual, patch);
+      const toStringArray = (val: unknown): string[] | undefined =>
+        Array.isArray(val)
+          ? val.filter((item): item is string => typeof item === 'string')
+          : undefined;
+
+      const edicao: EdicaoCurriculoPadrao = {
+        ...(typeof args.nomeCompleto === 'string' ? { nomeCompleto: args.nomeCompleto } : {}),
+        ...(typeof args.bairro === 'string' ? { bairro: args.bairro } : {}),
+        ...(typeof args.municipio === 'string' ? { municipio: args.municipio } : {}),
+        ...(typeof args.email === 'string' ? { email: args.email } : {}),
+        ...(typeof args.escolaridade === 'string'
+          ? {
+              escolaridade: normalizarNivelEscolaridade(args.escolaridade),
+              escolaridadeTexto: args.escolaridade,
+            }
+          : {}),
+        ...(typeof args.areaInteresse === 'string' ? { areaInteresse: args.areaInteresse } : {}),
+        ...(typeof args.objetivo === 'string' ? { objetivo: args.objetivo } : {}),
+        ...(typeof args.resumoProfissional === 'string'
+          ? { resumoProfissional: args.resumoProfissional }
+          : {}),
+        ...(typeof args.disponibilidade === 'string'
+          ? { disponibilidade: args.disponibilidade }
+          : {}),
+        ...(Array.isArray(args.competencias)
+          ? { competencias: toStringArray(args.competencias) }
+          : {}),
+        ...(Array.isArray(args.experiencias)
+          ? { experiencias: args.experiencias as CurriculoPadraoData['experiencias'] }
+          : {}),
+        ...(Array.isArray(args.formacoes)
+          ? { formacoes: args.formacoes as CurriculoPadraoData['formacoes'] }
+          : {}),
+        ...(Array.isArray(args.cursosCertificacoes)
+          ? {
+              cursosCertificacoes:
+                args.cursosCertificacoes as CurriculoPadraoData['cursosCertificacoes'],
+            }
+          : {}),
+        ...(Array.isArray(args.observacoesAdicionais)
+          ? { observacoesAdicionais: toStringArray(args.observacoesAdicionais) }
+          : {}),
+        ...(Array.isArray(args.removerCompetencias)
+          ? { removerCompetencias: toStringArray(args.removerCompetencias) }
+          : {}),
+        ...(Array.isArray(args.removerExperiencias)
+          ? { removerExperiencias: toStringArray(args.removerExperiencias) }
+          : {}),
+        ...(Array.isArray(args.removerCursosCertificacoes)
+          ? { removerCursosCertificacoes: toStringArray(args.removerCursosCertificacoes) }
+          : {}),
+        ...(Array.isArray(args.removerObservacoes)
+          ? { removerObservacoes: toStringArray(args.removerObservacoes) }
+          : {}),
+        ...(Array.isArray(args.limparCampos)
+          ? { limparCampos: toStringArray(args.limparCampos) }
+          : {}),
+      };
+
+      rascunhoAtual = aplicarEdicaoCurriculoPadrao(rascunhoAtual, edicao);
       estadoMutavel = 'CURRICULO';
       await deps.db.updateSessionState(turn.telefone, estadoMutavel, {
         rascunhoCurriculo: rascunhoAtual,
@@ -1087,6 +1135,7 @@ async function runConversationPipeline(
         candidatoId: session.candidatoId,
         telefone: turn.telefone,
         dados: rascunhoAtual,
+        substituirPerfilCompleto: true,
       });
 
       session.candidatoId = resultado.candidato.id;

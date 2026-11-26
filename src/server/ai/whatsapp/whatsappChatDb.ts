@@ -66,6 +66,7 @@ export interface FarolWhatsAppChatDb {
     candidatoId?: string | null;
     telefone?: string | null;
     dados?: Partial<CurriculoPadraoData>;
+    substituirPerfilCompleto?: boolean;
   }): Promise<{
     candidato: CandidatoRecord;
     arquivo: CurriculoArquivoRecord;

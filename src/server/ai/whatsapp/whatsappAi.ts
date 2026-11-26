@@ -138,8 +138,10 @@ REGRAS INVIOLÁVEIS DE COMPORTAMENTO E SEGURANÇA:
    - Use no máximo 4 a 6 linhas curtas por mensagem no WhatsApp (exceto ao resumir um currículo ou listar até 3 vagas/cursos com clareza). Use apenas um asterisco para *negrito* (nunca use \`**duplo asterisco**\`).
 2. **Consentimento LGPD antes de salvar dados pessoais no perfil:**
    - Se \`consentimentoLgpd\` for NÃO: explique brevemente que para guardar dados (nome, bairro, escolaridade e experiências) e buscar vagas/montar currículo, precisa da autorização do cidadão. Se ele já tiver acabado de autorizar ("sim", "pode", "autorizo", "1"), chame imediatamente a tool \`registrar_consentimento_lgpd(aceito: true)\` e prossiga na mesma resposta!
-3. **Coleta Progressiva e Leitura Inteligente de Mídias (Áudio, Documento, Imagem):**
+3. **Coleta Progressiva, Edições e Leitura Inteligente de Mídias (Áudio, Documento, Imagem):**
    - Sempre que o cidadão informar dados pessoais/profissionais por texto, áudio, documento ou foto (nome, bairro, escolaridade, experiências informais/formais, cursos, CNH, habilidades, objetivo), chame \`atualizar_rascunho_curriculo\` para salvar no contexto!
+   - Quando o cidadão pedir para **alterar, reescrever, substituir ou remover** qualquer informação ou competência/experiência/curso do currículo, use \`atualizar_rascunho_curriculo\` com os campos atualizados (ou \`removerCompetencias\` / \`removerExperiencias\` / \`removerCursosCertificacoes\` / \`limparCampos\`). Passar uma lista (ex.: \`competencias\`) substitui a lista anterior.
+   - Se o cidadão pedir para remover algo e gerar o novo PDF na mesma mensagem (ou após confirmar), aplique a edição primeiro com \`atualizar_rascunho_curriculo\` e em seguida chame \`gerar_e_enviar_curriculo_pdf(confirmadoUsuario: true)\` para reenviar o PDF atualizado.
    - Valorize trabalhos informais, bicos, freelances e projetos comunitários como experiência real válida.
    - Se o cidadão enviar uma imagem (ex.: foto de certificado, diploma, currículo, portfólio, CNH, anúncio de vaga), comente de forma inteligente o que foi identificado na imagem e diga como isso ajuda o currículo ou a busca de vagas.
 4. **Geração do Currículo Modelo Padrão FAROL (PDF):**
@@ -253,7 +255,7 @@ const FAROL_GEMINI_TOOLS_DECLARATION = [
       {
         name: 'atualizar_rascunho_curriculo',
         description:
-          'Atualiza no banco os dados coletados do cidadão para o Currículo Modelo Padrão FAROL e para o match de vagas.',
+          'Atualiza, edita ou remove campos do Currículo Modelo Padrão FAROL do cidadão. Qualquer campo ou lista enviado substitui o valor anterior do mesmo campo (omitidos são preservados). Para apagar itens específicos sem reenviar a lista inteira, use removerCompetencias, removerExperiencias, removerCursosCertificacoes, removerObservacoes ou limparCampos.',
         parameters: {
           type: 'OBJECT',
           properties: {
@@ -270,9 +272,14 @@ const FAROL_GEMINI_TOOLS_DECLARATION = [
             objetivo: { type: 'STRING' },
             resumoProfissional: { type: 'STRING' },
             disponibilidade: { type: 'STRING' },
-            competencias: { type: 'ARRAY', items: { type: 'STRING' } },
+            competencias: {
+              type: 'ARRAY',
+              items: { type: 'STRING' },
+              description: 'Lista completa de competências (substitui a lista atual quando enviada).',
+            },
             experiencias: {
               type: 'ARRAY',
+              description: 'Lista completa de experiências (substitui a lista atual quando enviada).',
               items: {
                 type: 'OBJECT',
                 properties: {
@@ -285,8 +292,23 @@ const FAROL_GEMINI_TOOLS_DECLARATION = [
                 required: ['cargo'],
               },
             },
+            formacoes: {
+              type: 'ARRAY',
+              description: 'Lista completa de formações acadêmicas (substitui a atual quando enviada).',
+              items: {
+                type: 'OBJECT',
+                properties: {
+                  nivel: { type: 'STRING' },
+                  curso: { type: 'STRING' },
+                  instituicao: { type: 'STRING' },
+                  anoConclusao: { type: 'STRING' },
+                },
+                required: ['nivel'],
+              },
+            },
             cursosCertificacoes: {
               type: 'ARRAY',
+              description: 'Lista completa de cursos/certificações (substitui a atual quando enviada).',
               items: {
                 type: 'OBJECT',
                 properties: {
@@ -297,7 +319,37 @@ const FAROL_GEMINI_TOOLS_DECLARATION = [
                 required: ['titulo'],
               },
             },
-            observacoesAdicionais: { type: 'ARRAY', items: { type: 'STRING' } },
+            observacoesAdicionais: {
+              type: 'ARRAY',
+              items: { type: 'STRING' },
+              description: 'Lista completa de observações adicionais (substitui a atual quando enviada).',
+            },
+            removerCompetencias: {
+              type: 'ARRAY',
+              items: { type: 'STRING' },
+              description: 'Remove uma ou mais competências pelo nome.',
+            },
+            removerExperiencias: {
+              type: 'ARRAY',
+              items: { type: 'STRING' },
+              description: 'Remove experiências cujo cargo ou empresa correspondam aos termos.',
+            },
+            removerCursosCertificacoes: {
+              type: 'ARRAY',
+              items: { type: 'STRING' },
+              description: 'Remove cursos/certificações cujo título corresponda aos termos.',
+            },
+            removerObservacoes: {
+              type: 'ARRAY',
+              items: { type: 'STRING' },
+              description: 'Remove observações adicionais correspondentes aos termos.',
+            },
+            limparCampos: {
+              type: 'ARRAY',
+              items: { type: 'STRING' },
+              description:
+                'Nomes de campos opcionais para zerar (ex: objetivo, resumoProfissional, areaInteresse, disponibilidade, email, competencias, experiencias).',
+            },
           },
         },
       },

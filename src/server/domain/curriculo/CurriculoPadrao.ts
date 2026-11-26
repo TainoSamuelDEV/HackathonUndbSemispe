@@ -250,6 +250,182 @@ export function mesclarCurriculoPadrao(
   });
 }
 
+export interface EdicaoCurriculoPadrao {
+  nomeCompleto?: string;
+  bairro?: string;
+  municipio?: string;
+  telefoneWhatsApp?: string;
+  email?: string;
+  escolaridade?: NivelEscolaridade | null;
+  escolaridadeTexto?: string;
+  areaInteresse?: string;
+  objetivo?: string;
+  resumoProfissional?: string;
+  disponibilidade?: string;
+  competencias?: string[];
+  experiencias?: ExperienciaCurriculo[];
+  formacoes?: FormacaoCurriculo[];
+  cursosCertificacoes?: CursoCertificacaoCurriculo[];
+  observacoesAdicionais?: string[];
+  removerCompetencias?: string[];
+  removerExperiencias?: string[];
+  removerCursosCertificacoes?: string[];
+  removerObservacoes?: string[];
+  limparCampos?: string[];
+}
+
+function correspondeTermoRemocao(valor: string, alvosNormalizados: string[]): boolean {
+  const valNorm = normalizarTexto(valor);
+  if (!valNorm) return false;
+  return alvosNormalizados.some(
+    (alvo) =>
+      alvo === valNorm ||
+      (alvo.length >= 4 && (valNorm.includes(alvo) || alvo.includes(valNorm)))
+  );
+}
+
+/**
+ * Aplica edição explícita no currículo: campos e listas enviados substituem os anteriores,
+ * permitindo editar, reescrever, limpar campos ou remover itens específicos.
+ */
+export function aplicarEdicaoCurriculoPadrao(
+  atual: Partial<CurriculoPadraoData>,
+  edicao: EdicaoCurriculoPadrao
+): CurriculoPadraoData {
+  const base = sanitizarCurriculoPadrao(atual);
+  const limparSet = new Set(
+    (edicao.limparCampos ?? []).map((c) => normalizarTexto(c)).filter(Boolean)
+  );
+
+  const limparSeVazioOuMarcado = (
+    campoKey: string,
+    valorNovo: string | undefined,
+    valorAtual: string | undefined
+  ): string | undefined => {
+    if (limparSet.has(normalizarTexto(campoKey))) return undefined;
+    if (valorNovo !== undefined) {
+      return valorNovo.trim() ? valorNovo : undefined;
+    }
+    return valorAtual;
+  };
+
+  let competencias =
+    edicao.competencias !== undefined ? edicao.competencias : base.competencias;
+  let experiencias =
+    edicao.experiencias !== undefined ? edicao.experiencias : base.experiencias;
+  let formacoes =
+    edicao.formacoes !== undefined ? edicao.formacoes : base.formacoes;
+  let cursosCertificacoes =
+    edicao.cursosCertificacoes !== undefined
+      ? edicao.cursosCertificacoes
+      : base.cursosCertificacoes;
+  let observacoesAdicionais =
+    edicao.observacoesAdicionais !== undefined
+      ? edicao.observacoesAdicionais
+      : base.observacoesAdicionais;
+
+  if (limparSet.has('competencias')) competencias = [];
+  if (limparSet.has('experiencias')) experiencias = [];
+  if (limparSet.has('formacoes')) formacoes = [];
+  if (limparSet.has('cursoscertificacoes') || limparSet.has('cursos')) {
+    cursosCertificacoes = [];
+  }
+  if (limparSet.has('observacoesadicionais') || limparSet.has('observacoes')) {
+    observacoesAdicionais = [];
+  }
+
+  const remComp = (edicao.removerCompetencias ?? []).map(normalizarTexto).filter(Boolean);
+  if (remComp.length > 0) {
+    competencias = competencias.filter((c) => !correspondeTermoRemocao(c, remComp));
+  }
+
+  const remExp = (edicao.removerExperiencias ?? []).map(normalizarTexto).filter(Boolean);
+  if (remExp.length > 0) {
+    experiencias = experiencias.filter(
+      (e) =>
+        !correspondeTermoRemocao(e.cargo, remExp) &&
+        !(e.empresa && correspondeTermoRemocao(e.empresa, remExp))
+    );
+  }
+
+  const remCursos = (edicao.removerCursosCertificacoes ?? [])
+    .map(normalizarTexto)
+    .filter(Boolean);
+  if (remCursos.length > 0) {
+    cursosCertificacoes = cursosCertificacoes.filter(
+      (c) => !correspondeTermoRemocao(c.titulo, remCursos)
+    );
+  }
+
+  const remObs = (edicao.removerObservacoes ?? []).map(normalizarTexto).filter(Boolean);
+  if (remObs.length > 0) {
+    observacoesAdicionais = observacoesAdicionais.filter(
+      (o) => !correspondeTermoRemocao(o, remObs)
+    );
+  }
+
+  const escolaridadeLimpa = limparSet.has('escolaridade');
+  const escolaridade = escolaridadeLimpa
+    ? null
+    : edicao.escolaridade !== undefined
+      ? edicao.escolaridade
+      : edicao.escolaridadeTexto !== undefined
+        ? normalizarNivelEscolaridade(edicao.escolaridadeTexto)
+        : base.escolaridade ?? null;
+
+  const escolaridadeTexto = escolaridadeLimpa
+    ? undefined
+    : edicao.escolaridadeTexto !== undefined
+      ? edicao.escolaridadeTexto.trim() || undefined
+      : edicao.escolaridade !== undefined
+        ? edicao.escolaridade
+          ? labelEscolaridade(edicao.escolaridade)
+          : undefined
+        : base.escolaridadeTexto;
+
+  return sanitizarCurriculoPadrao({
+    nomeCompleto:
+      edicao.nomeCompleto !== undefined
+        ? edicao.nomeCompleto.trim() || base.nomeCompleto
+        : base.nomeCompleto,
+    bairro:
+      edicao.bairro !== undefined ? edicao.bairro.trim() || base.bairro : base.bairro,
+    municipio:
+      edicao.municipio !== undefined
+        ? edicao.municipio.trim() || base.municipio
+        : base.municipio,
+    telefoneWhatsApp: limparSeVazioOuMarcado(
+      'telefoneWhatsApp',
+      edicao.telefoneWhatsApp,
+      base.telefoneWhatsApp
+    ),
+    email: limparSeVazioOuMarcado('email', edicao.email, base.email),
+    escolaridade,
+    escolaridadeTexto,
+    areaInteresse: limparSeVazioOuMarcado(
+      'areaInteresse',
+      edicao.areaInteresse,
+      base.areaInteresse
+    ),
+    objetivo: limparSeVazioOuMarcado('objetivo', edicao.objetivo, base.objetivo),
+    resumoProfissional: limparSeVazioOuMarcado(
+      'resumoProfissional',
+      edicao.resumoProfissional,
+      base.resumoProfissional
+    ),
+    disponibilidade: limparSeVazioOuMarcado(
+      'disponibilidade',
+      edicao.disponibilidade,
+      base.disponibilidade
+    ),
+    competencias,
+    experiencias,
+    formacoes,
+    cursosCertificacoes,
+    observacoesAdicionais,
+  });
+}
+
 export function calcularCompletudeCurriculo(dados: Partial<CurriculoPadraoData>): {
   prontoParaGerar: boolean;
   percentual: number;

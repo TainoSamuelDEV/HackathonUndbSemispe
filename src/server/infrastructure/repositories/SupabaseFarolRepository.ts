@@ -556,17 +556,13 @@ export class SupabaseFarolRepository {
         nomeCompleto,
         nomeExibicao,
         bairro,
-        escolaridade: dadosLimpos.escolaridade ?? existente.candidato.escolaridade,
-        areaInteresse: dadosLimpos.areaInteresse ?? existente.candidato.areaInteresse,
-        objetivo: dadosLimpos.objetivo ?? existente.candidato.objetivo,
-        resumoProfissional: dadosLimpos.resumoProfissional ?? existente.candidato.resumoProfissional,
-        disponibilidade: dadosLimpos.disponibilidade ?? existente.candidato.disponibilidade,
-        competencias:
-          dadosLimpos.competencias.length > 0
-            ? dadosLimpos.competencias
-            : existente.candidato.competencias,
-        experiencias:
-          experienciasMapped.length > 0 ? experienciasMapped : existente.candidato.experiencias,
+        escolaridade: dadosLimpos.escolaridade ?? null,
+        areaInteresse: dadosLimpos.areaInteresse ?? null,
+        objetivo: dadosLimpos.objetivo ?? null,
+        resumoProfissional: dadosLimpos.resumoProfissional ?? null,
+        disponibilidade: dadosLimpos.disponibilidade ?? null,
+        competencias: dadosLimpos.competencias,
+        experiencias: experienciasMapped,
       });
     }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  aplicarEdicaoCurriculoPadrao,
   calcularCompletudeCurriculo,
   gerarNomeArquivoCurriculo,
   mesclarCurriculoPadrao,
@@ -160,5 +161,42 @@ describe('Currículo Modelo Padrão FAROL & Gerador PDF', () => {
     expect(gerarNomeArquivoCurriculo('../../etc/passwd João!')).toBe(
       'Curriculo_FAROL_etc_passwd_Joao.pdf'
     );
+  });
+
+  it('permite remover competências, substituir listas e limpar campos com aplicarEdicaoCurriculoPadrao', () => {
+    const inicial = sanitizarCurriculoPadrao({
+      nomeCompleto: 'Taino Samuel Lima Ribeiro',
+      bairro: 'Anjo da Guarda',
+      escolaridade: 'TECNICO',
+      objetivo: 'Atuação em Help Desk N1/N2',
+      competencias: [
+        'Atendimento via WhatsApp e Plataformas Web',
+        'Excelente comunicação verbal e escrita',
+        'Help Desk (N1/N2)',
+      ],
+      experiencias: [
+        { cargo: 'Analista de Suporte', empresa: 'Anotado', periodo: '2024 - 2026' },
+        { cargo: 'Estagiário de TI', empresa: 'Prefeitura', periodo: '2023' },
+      ],
+    });
+
+    const semCompetencia = aplicarEdicaoCurriculoPadrao(inicial, {
+      removerCompetencias: ['Excelente comunicação verbal e escrita'],
+      removerExperiencias: ['Estagiário de TI'],
+      limparCampos: ['objetivo'],
+    });
+
+    expect(semCompetencia.competencias).toEqual([
+      'Atendimento via WhatsApp e Plataformas Web',
+      'Help Desk (N1/N2)',
+    ]);
+    expect(semCompetencia.experiencias).toHaveLength(1);
+    expect(semCompetencia.experiencias[0].cargo).toBe('Analista de Suporte');
+    expect(semCompetencia.objetivo).toBeUndefined();
+
+    const substituido = aplicarEdicaoCurriculoPadrao(semCompetencia, {
+      competencias: ['Help Desk (N1/N2)', 'Ferramentas de CRM/Tickets'],
+    });
+    expect(substituido.competencias).toEqual(['Help Desk (N1/N2)', 'Ferramentas de CRM/Tickets']);
   });
 });
