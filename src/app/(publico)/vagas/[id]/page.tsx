@@ -21,19 +21,30 @@ export default function VagaDetalhePage() {
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
+    let ativo = true;
     setCarregando(true);
-    fetch(`/api/vagas/${params.id}`)
-      .then((r) => r.json())
-      .then((res) => setVaga(res?.data?.vaga ?? null))
-      .catch(() => setVaga(null))
-      .finally(() => setCarregando(false));
 
-    fetch(`/api/vagas/${params.id}/match`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((res) => {
-        if (res?.data?.match) setMatch(res.data.match);
-      })
+    // Vaga e compatibilidade carregam juntas, para a página aparecer completa (sem saltos de layout).
+    // A compatibilidade só existe para candidato logado; nos demais casos a requisição falha e é ignorada.
+    const buscarVaga = fetch(`/api/vagas/${params.id}`)
+      .then((r) => r.json())
+      .then((res): VagaRecord | null => res?.data?.vaga ?? null)
       .catch(() => null);
+    const buscarMatch = fetch(`/api/vagas/${params.id}/match`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res): ResultadoMatch | null => res?.data?.match ?? null)
+      .catch(() => null);
+
+    Promise.all([buscarVaga, buscarMatch]).then(([vagaCarregada, matchCarregado]) => {
+      if (!ativo) return;
+      setVaga(vagaCarregada);
+      setMatch(matchCarregado);
+      setCarregando(false);
+    });
+
+    return () => {
+      ativo = false;
+    };
   }, [params.id]);
 
   async function candidatar() {

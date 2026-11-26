@@ -1,12 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { VagaRecord } from '@/server/infrastructure/repositories/FarolDataStore';
 import { capaDaVaga, urlCapaValida } from '@/lib/capaVaga';
 import { CapaImagem } from '@/components/cards/CapaImagem';
+import { ListaPainelSkeleton } from '@/components/skeletons/PainelSkeletons';
+import { EstadoErroCarregamento } from '@/components/layout/EstadoErroCarregamento';
 
 export default function PainelEmpresaPage() {
-  const [vagas, setVagas] = useState<VagaRecord[]>([]);
+  /** null enquanto carrega. */
+  const [vagas, setVagas] = useState<VagaRecord[] | null>(null);
+  const [erroVagas, setErroVagas] = useState(false);
   const [titulo, setTitulo] = useState('');
   const [area, setArea] = useState('Manutenção e mecânica');
   const [bairro, setBairro] = useState('Itaqui-Bacanga');
@@ -24,18 +28,27 @@ export default function PainelEmpresaPage() {
     titulo,
   });
 
-  function carregar() {
+  /** Busca as vagas da empresa. Sem `manterLista`, mostra o skeleton durante a busca. */
+  const carregar = useCallback((manterLista = false) => {
+    setErroVagas(false);
+    if (!manterLista) setVagas(null);
     fetch('/api/empresa/vagas')
       .then((r) => {
-        if (r.status === 401) window.location.href = '/entrar';
-        return r.json();
+        if (r.status === 401) {
+          window.location.href = '/entrar?next=/empresa';
+          return null;
+        }
+        return r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`));
       })
-      .then((res) => setVagas(res?.data?.vagas ?? []));
-  }
+      .then((res) => {
+        if (res) setVagas(res?.data?.vagas ?? []);
+      })
+      .catch(() => setErroVagas(true));
+  }, []);
 
   useEffect(() => {
     carregar();
-  }, []);
+  }, [carregar]);
 
   async function publicar(e: React.FormEvent) {
     e.preventDefault();
@@ -73,7 +86,7 @@ export default function PainelEmpresaPage() {
       setReqObrig('');
       setImagemCapaUrl('');
       setMensagem('Vaga publicada no catálogo público e sincronizada com a IA FAROL!');
-      carregar();
+      carregar(true);
     } else {
       const json = await resp.json().catch(() => null);
       const erroCapa = json?.error?.details?.fieldErrors?.imagemCapaUrl?.[0];
@@ -183,7 +196,18 @@ export default function PainelEmpresaPage() {
 
       <div className="border border-[#DCE7EF] rounded-[16px] p-4 sm:p-6 bg-white space-y-3">
         <h2 className="font-heading text-xl font-bold text-[#0B2540]">Minhas Vagas Publicadas</h2>
-        {vagas.map((v) => (
+        {erroVagas && (
+          <EstadoErroCarregamento mensagem="Não foi possível carregar suas vagas." onTentarNovamente={() => carregar()} />
+        )}
+        {!erroVagas && vagas === null && (
+          <div role="status" aria-label="Carregando suas vagas">
+            <ListaPainelSkeleton quantidade={2} />
+          </div>
+        )}
+        {vagas?.length === 0 && (
+          <p className="text-sm text-[#66788A]">Você ainda não publicou nenhuma vaga.</p>
+        )}
+        {vagas?.map((v) => (
           <div key={v.id} className="border border-[#DCE7EF] rounded-[12px] p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
             <div className="min-w-0">
               <strong className="text-sm text-[#0B2540] break-words">{v.titulo}</strong>

@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { PainelAdminSkeleton } from '@/components/skeletons/PainelSkeletons';
+import { EstadoErroCarregamento } from '@/components/layout/EstadoErroCarregamento';
 
 interface DashboardSemispe {
   totais: {
@@ -21,22 +23,42 @@ interface DashboardSemispe {
 
 export default function PainelAdminSemispePage() {
   const [dados, setDados] = useState<DashboardSemispe | null>(null);
+  const [erro, setErro] = useState(false);
 
-  useEffect(() => {
+  const carregar = useCallback(() => {
+    setErro(false);
+    setDados(null);
     fetch('/api/admin/dashboard')
       .then((r) => {
-        if (r.status === 401) window.location.href = '/entrar';
-        return r.json();
+        if (r.status === 401) {
+          window.location.href = '/entrar?next=/admin';
+          return null;
+        }
+        return r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`));
       })
-      .then((res) => setDados(res?.data?.dashboard ?? null));
+      .then((res) => {
+        if (!res) return;
+        const dashboard = res?.data?.dashboard;
+        if (!dashboard) throw new Error('Painel ausente na resposta');
+        setDados(dashboard);
+      })
+      .catch(() => setErro(true));
   }, []);
 
-  if (!dados) {
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
+
+  if (erro) {
     return (
-      <div className="max-w-[1100px] mx-auto px-4 py-12 text-sm text-[#66788A]">
-        Carregando painel SEMISPE...
+      <div className="max-w-[1100px] mx-auto px-4 sm:px-6 py-10">
+        <EstadoErroCarregamento mensagem="Não foi possível carregar o painel SEMISPE." onTentarNovamente={carregar} />
       </div>
     );
+  }
+
+  if (!dados) {
+    return <PainelAdminSkeleton />;
   }
 
   return (

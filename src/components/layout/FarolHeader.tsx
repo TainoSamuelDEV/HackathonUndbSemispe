@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Menu, X, User, LogOut } from 'lucide-react';
 import type { UsuarioSessao } from '@/types/farol';
+import { Skeleton } from '@/components/skeletons/Skeleton';
 
 /**
  * Header flutuante em pílula. Na página principal ele fica sobre a mídia da hero
@@ -14,12 +15,14 @@ export function FarolHeader() {
   const pathname = usePathname();
   const [menuAberto, setMenuAberto] = useState(false);
   const [usuario, setUsuario] = useState<UsuarioSessao | null>(null);
+  const [sessaoCarregada, setSessaoCarregada] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/me')
       .then((r) => r.json())
       .then((res) => setUsuario(res?.data?.usuario ?? null))
-      .catch(() => setUsuario(null));
+      .catch(() => setUsuario(null))
+      .finally(() => setSessaoCarregada(true));
   }, []);
 
   // Fecha o menu mobile ao trocar de página
@@ -44,7 +47,7 @@ export function FarolHeader() {
     { href: '/', label: 'Página Principal' },
     { href: '/vagas', label: 'Vagas' },
     { href: '/cursos', label: 'Cursos' },
-    { href: '/newsletter', label: 'Newsletter' },
+    { href: '/editais-e-eventos', label: 'Editais e Eventos' },
     { href: usuario ? rotaPainel : '/entrar?next=/painel', label: 'Meu Currículo' },
     { href: '/sobre', label: 'Sobre o FAROL' },
   ];
@@ -88,7 +91,9 @@ export function FarolHeader() {
           </nav>
 
           <div className="flex items-center gap-1.5">
-            {usuario ? (
+            {!sessaoCarregada ? (
+              <Skeleton className="hidden sm:block h-11 w-28 rounded-full" />
+            ) : usuario ? (
               <div className="hidden lg:flex items-center gap-1.5">
                 <Link
                   href={rotaPainel}
@@ -151,7 +156,9 @@ export function FarolHeader() {
               ))}
             </nav>
             <div className="p-2 pt-3">
-              {usuario ? (
+              {!sessaoCarregada ? (
+                <Skeleton className="h-12 w-full rounded-full" />
+              ) : usuario ? (
                 <div className="flex gap-2">
                   <Link
                     href={rotaPainel}

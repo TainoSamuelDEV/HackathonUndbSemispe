@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { CandidatoRecord } from '@/server/infrastructure/repositories/FarolDataStore';
+import { ListaPainelSkeleton, PainelCandidatoSkeleton } from '@/components/skeletons/PainelSkeletons';
+import { EstadoErroCarregamento } from '@/components/layout/EstadoErroCarregamento';
 
 interface CandidaturaItem {
   id: string;
@@ -13,28 +15,43 @@ interface CandidaturaItem {
 
 export default function PainelCandidatoPage() {
   const [perfil, setPerfil] = useState<CandidatoRecord | null>(null);
-  const [candidaturas, setCandidaturas] = useState<CandidaturaItem[]>([]);
+  const [erroPerfil, setErroPerfil] = useState(false);
+  /** null enquanto carrega. */
+  const [candidaturas, setCandidaturas] = useState<CandidaturaItem[] | null>(null);
   const [competenciasInput, setCompetenciasInput] = useState('');
   const [salvoMsg, setSalvoMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  const carregar = useCallback(() => {
+    setErroPerfil(false);
+    setPerfil(null);
+    setCandidaturas(null);
+
     fetch('/api/candidato/curriculo')
       .then((r) => {
-        if (r.status === 401) window.location.href = '/entrar';
-        return r.json();
+        if (r.status === 401) {
+          window.location.href = '/entrar?next=/painel';
+          return null;
+        }
+        return r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`));
       })
       .then((res) => {
+        if (!res) return;
         const p = res?.data?.perfil;
-        if (p) {
-          setPerfil(p);
-          setCompetenciasInput((p.competencias ?? []).join(', '));
-        }
-      });
+        if (!p) throw new Error('Perfil ausente na resposta');
+        setPerfil(p);
+        setCompetenciasInput((p.competencias ?? []).join(', '));
+      })
+      .catch(() => setErroPerfil(true));
 
     fetch('/api/candidato/candidaturas')
-      .then((r) => r.json())
-      .then((res) => setCandidaturas(res?.data?.candidaturas ?? []));
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => setCandidaturas(res?.data?.candidaturas ?? []))
+      .catch(() => setCandidaturas([]));
   }, []);
+
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
 
   async function salvarCompetencias(e: React.FormEvent) {
     e.preventDefault();
@@ -56,12 +73,16 @@ export default function PainelCandidatoPage() {
     }
   }
 
-  if (!perfil) {
+  if (erroPerfil) {
     return (
-      <div className="max-w-[1000px] mx-auto px-4 py-12 text-sm text-[#66788A]">
-        Carregando seu painel...
+      <div className="max-w-[1000px] mx-auto px-4 sm:px-6 py-10">
+        <EstadoErroCarregamento mensagem="Não foi possível carregar seu painel." onTentarNovamente={carregar} />
       </div>
     );
+  }
+
+  if (!perfil) {
+    return <PainelCandidatoSkeleton />;
   }
 
   return (
@@ -113,7 +134,11 @@ export default function PainelCandidatoPage() {
 
       <div className="border border-[#DCE7EF] rounded-[16px] p-6 bg-white space-y-4">
         <h2 className="font-heading text-xl font-bold text-[#0B2540]">Minhas Candidaturas</h2>
-        {candidaturas.length === 0 ? (
+        {candidaturas === null ? (
+          <div role="status" aria-label="Carregando candidaturas">
+            <ListaPainelSkeleton quantidade={2} />
+          </div>
+        ) : candidaturas.length === 0 ? (
           <p className="text-sm text-[#66788A]">Você ainda não se candidatou a nenhuma vaga.</p>
         ) : (
           <div className="space-y-3">
