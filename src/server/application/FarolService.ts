@@ -5,13 +5,18 @@ import {
   AcessoNegadoError,
   RecursoNaoEncontradoError,
   RegraNegocioError,
+  ValidacaoError,
 } from '@/server/domain/errors/DomainError';
+import { normalizarContatoBoletim } from '@/server/domain/boletim/contatoBoletim';
+import { hojeEmSaoLuis } from '@/lib/datasSaoLuis';
 import {
   farolMemoryStore,
   type CandidatoRecord,
   type CandidaturaRecord,
   type ConversaWhatsAppRecord,
   type CursoRecord,
+  type EditalRecord,
+  type EventoRecord,
   type InscricaoCursoRecord,
   type PedidoCursoRecord,
   type VagaRecord,
@@ -26,6 +31,7 @@ import type {
   RequisitoVaga,
   ResultadoMatch,
   StatusCandidatura,
+  TipoContatoBoletim,
   TipoContratacao,
   TipoCurso,
   UsuarioSessao,
@@ -701,6 +707,93 @@ export class FarolService {
     };
     farolMemoryStore.pedidosCursos.unshift(pedido);
     return pedido;
+  }
+
+  // --------------------------------------------------------------------------
+  // EDITAIS, EVENTOS E BOLETIM
+  // --------------------------------------------------------------------------
+
+  /** Editais publicados com inscrições abertas hoje (horário de São Luís) ou em fluxo contínuo. */
+  async listarEditaisAbertos(): Promise<EditalRecord[]> {
+    const hoje = hojeEmSaoLuis();
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.listarEditaisAbertos(hoje);
+    }
+
+    return farolMemoryStore.editais
+      .filter((e) => e.publicado && (!e.inscricoesAte || e.inscricoesAte >= hoje))
+      .sort((a, b) => {
+        if (a.inscricoesAte && b.inscricoesAte) return a.inscricoesAte.localeCompare(b.inscricoesAte);
+        if (a.inscricoesAte) return -1;
+        if (b.inscricoesAte) return 1;
+        return a.titulo.localeCompare(b.titulo, 'pt-BR');
+      });
+  }
+
+  /** Eventos publicados que ainda não terminaram, do mais próximo ao mais distante. */
+  async listarProximosEventos(): Promise<EventoRecord[]> {
+    const agora = new Date().toISOString();
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.listarProximosEventos(agora);
+    }
+
+    return farolMemoryStore.eventos
+      .filter((e) => e.publicado && (e.fim ?? e.inicio) >= agora)
+      .sort((a, b) => a.inicio.localeCompare(b.inicio));
+  }
+
+  /**
+   * Inscreve um e-mail ou WhatsApp no boletim. Idempotente: um contato já inscrito
+   * não é duplicado, e uma inscrição desativada é reativada com novo consentimento.
+   */
+  async inscreverNoBoletim(input: {
+    contato: string;
+    origemCanal: CanalOrigem;
+  }): Promise<{ tipoContato: TipoContatoBoletim; jaInscrito: boolean }> {
+    const normalizado = normalizarContatoBoletim(input.contato);
+    if (!normalizado) {
+      throw new ValidacaoError('Informe um e-mail válido ou um WhatsApp com DDD.');
+    }
+
+    if (this.usarSupabase()) {
+      const existente = await supabaseFarolRepo.buscarInscricaoBoletim(normalizado.contato);
+      if (existente?.ativo) return { tipoContato: existente.tipoContato, jaInscrito: true };
+      if (existente) {
+        await supabaseFarolRepo.reativarInscricaoBoletim(existente.id, input.origemCanal);
+        return { tipoContato: existente.tipoContato, jaInscrito: false };
+      }
+      const { duplicada } = await supabaseFarolRepo.criarInscricaoBoletim({
+        contato: normalizado.contato,
+        tipoContato: normalizado.tipo,
+        origemCanal: input.origemCanal,
+      });
+      return { tipoContato: normalizado.tipo, jaInscrito: duplicada };
+    }
+
+    const agora = new Date().toISOString();
+    const existente = farolMemoryStore.inscricoesBoletim.find((i) => i.contato === normalizado.contato);
+    if (existente?.ativo) return { tipoContato: existente.tipoContato, jaInscrito: true };
+    if (existente) {
+      Object.assign(existente, {
+        ativo: true,
+        consentimentoLgpd: true,
+        consentimentoEm: agora,
+        origemCanal: input.origemCanal,
+      });
+      return { tipoContato: existente.tipoContato, jaInscrito: false };
+    }
+
+    farolMemoryStore.inscricoesBoletim.push({
+      id: crypto.randomUUID(),
+      contato: normalizado.contato,
+      tipoContato: normalizado.tipo,
+      consentimentoLgpd: true,
+      consentimentoEm: agora,
+      origemCanal: input.origemCanal,
+      ativo: true,
+      criadoEm: agora,
+    });
+    return { tipoContato: normalizado.tipo, jaInscrito: false };
   }
 
   // --------------------------------------------------------------------------

@@ -50,7 +50,9 @@ erDiagram
    * `visivel_servicos` controla o opt-in para o diretório **Serviços** das empresas.
 3. **Motor de Match Estruturado:** `vaga_requisitos` e `candidato_competencias` normalizam requisitos obrigatórios vs. desejáveis e escolaridade, permitindo cálculo determinístico auditável (70% obrigatórios / 30% desejáveis) sem depender de texto livre.
 4. **Trilha de Auditoria Imutável:** Uma trigger no PostgreSQL bloqueia `UPDATE` e `DELETE` na tabela `candidatura_eventos`, preservando toda a trajetória de seleção.
-5. **Selo de Demonstração:** `vagas.selo_simulado` e `cursos.selo_simulado` identificam registros fictícios usados em testes/apresentação.
+5. **Selo de Demonstração:** `selo_simulado` (em `vagas`, `cursos`, `editais` e `eventos`) identifica registros fictícios usados em testes/apresentação.
+6. **Agenda sempre atual:** `eventos.termina_em` é uma coluna gerada (`COALESCE(fim, inicio)`); o portal lista apenas eventos com `termina_em >= agora` e editais com `inscricoes_ate` nula (fluxo contínuo) ou ainda não vencida.
+7. **Boletim com dado mínimo:** `inscricoes_boletim` guarda só o contato normalizado (e-mail em minúsculas ou WhatsApp com DDI 55), com consentimento obrigatório (`CHECK`) e unicidade por contato.
 
 ---
 
@@ -64,6 +66,7 @@ erDiagram
 | **Seleção & Auditoria** | `candidaturas`, `candidatura_eventos` | Candidatura única por vaga, canal de origem (`WEB`/`WHATSAPP`), score calculado (restrito ao candidato/SEMISPE) e histórico imutável. |
 | **Cursos & Demanda** | `cursos`, `turmas`, `inscricoes_cursos`, `pedidos_cursos` | Cursos programados vs. sob demanda, aprovação pela SEMISPE, frequência/certificado e ranking de pedidos de novos cursos. |
 | **IA FAROL (WhatsApp)** | `conversas_whatsapp`, `mensagens_whatsapp` | Persistência da máquina de estados (10 etapas), contexto parcial para retomada de conversa, escalonamento humano e log de mensagens. |
+| **Editais & Eventos** | `editais`, `eventos`, `inscricoes_boletim` | Conteúdo da página pública "Editais e eventos" (chamadas de fomento, programas e agenda do ecossistema) e lista de inscritos no boletim. Migration [20261125000004](../supabase/migrations/20261125000004_editais_eventos_boletim.sql). |
 
 ---
 

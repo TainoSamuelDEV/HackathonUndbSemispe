@@ -161,7 +161,7 @@ export function HeroLanding({
             </div>
 
             <Link
-              href="/newsletter"
+              href="/editais-e-eventos"
               className="inline-flex items-center gap-1.5 mt-4 text-sm font-semibold text-[#0162A7] hover:underline underline-offset-4"
             >
               Editais e eventos em São Luís

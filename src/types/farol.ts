@@ -14,6 +14,8 @@ export type TipoContratacao = 'CLT' | 'ESTAGIO' | 'JOVEM_APRENDIZ' | 'TEMPORARIO
 export type StatusVaga = 'RASCUNHO' | 'PUBLICADA' | 'ENCERRADA' | 'EXPIRADA';
 export type OrigemVaga = 'INTERNA' | 'EXTERNA';
 export type CanalOrigem = 'WEB' | 'WHATSAPP';
+export type ModalidadeEvento = 'PRESENCIAL' | 'ONLINE' | 'HIBRIDO';
+export type TipoContatoBoletim = 'EMAIL' | 'WHATSAPP';
 
 export type StatusCandidatura =
   | 'INSCRITO'

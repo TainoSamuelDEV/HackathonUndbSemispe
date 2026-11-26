@@ -51,6 +51,7 @@ Este documento consolida o mapa de rotas Next.js App Router, a identidade visual
 | `(publico)` | `/cursos` | Catálogo de Cursos (abas: Turmas Abertas vs. Sob Demanda) | Público | P0 |
 | `(publico)` | `/cursos/[id]` | Detalhe do Curso / Turma + Solicitar Inscrição ou Interesse | Público | P0 |
 | `(publico)` | `/sobre` | Sobre o FAROL, SEMISPE, foco Itaqui-Bacanga e futuro Parque | Público | P0 |
+| `(publico)` | `/editais-e-eventos` | Editais abertos, próximos eventos (com .ics) e inscrição no boletim. `/newsletter` redireciona (308) | Público | P1 |
 | `(auth)` | `/entrar` | Login próprio (e-mail/senha) | Público | P0 |
 | `(auth)` | `/cadastro` | Seleção de perfil (Pessoa Física ou Empresa/Startup) | Público | P0 |
 | `(auth)` | `/cadastro/pessoa` | Cadastro de Candidato | Público | P0 |

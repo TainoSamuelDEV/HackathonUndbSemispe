@@ -9,6 +9,9 @@ import type {
   CandidaturaRecord,
   ConversaWhatsAppRecord,
   CursoRecord,
+  EditalRecord,
+  EventoRecord,
+  InscricaoBoletimRecord,
   InscricaoCursoRecord,
   PedidoCursoRecord,
   UsuarioRecord,
@@ -22,9 +25,62 @@ import type {
   RequisitoVaga,
   ResultadoMatch,
   StatusCandidatura,
+  TipoContatoBoletim,
   TipoContratacao,
   TipoCurso,
 } from '@/types/farol';
+
+function listaDeTexto(valor: unknown): string[] {
+  return Array.isArray(valor) ? valor.filter((v): v is string => typeof v === 'string') : [];
+}
+
+function mapEditalRow(row: any): EditalRecord {
+  return {
+    id: row.id,
+    titulo: row.titulo,
+    organizacao: row.organizacao,
+    resumo: row.resumo,
+    publicoAlvo: row.publico_alvo,
+    beneficio: row.beneficio,
+    inscricoesAte: row.inscricoes_ate,
+    prazoDescricao: row.prazo_descricao,
+    linkUrl: row.link_url,
+    tags: listaDeTexto(row.tags),
+    seloSimulado: Boolean(row.selo_simulado),
+    publicado: Boolean(row.publicado),
+  };
+}
+
+function mapEventoRow(row: any): EventoRecord {
+  return {
+    id: row.id,
+    titulo: row.titulo,
+    organizacao: row.organizacao,
+    resumo: row.resumo,
+    inicio: new Date(row.inicio).toISOString(),
+    fim: row.fim ? new Date(row.fim).toISOString() : null,
+    local: row.local,
+    modalidade: row.modalidade,
+    gratuito: Boolean(row.gratuito),
+    linkInscricao: row.link_inscricao,
+    tags: listaDeTexto(row.tags),
+    seloSimulado: Boolean(row.selo_simulado),
+    publicado: Boolean(row.publicado),
+  };
+}
+
+function mapInscricaoBoletimRow(row: any): InscricaoBoletimRecord {
+  return {
+    id: row.id,
+    contato: row.contato,
+    tipoContato: row.tipo_contato,
+    consentimentoLgpd: Boolean(row.consentimento_lgpd),
+    consentimentoEm: row.consentimento_em,
+    origemCanal: row.origem_canal,
+    ativo: Boolean(row.ativo),
+    criadoEm: row.criado_em,
+  };
+}
 
 function mapVagaRow(row: any): VagaRecord {
   return {
@@ -825,6 +881,89 @@ export class SupabaseFarolRepository {
       atendimentoHumano: Boolean(data.atendimento_humano),
       ultimaInteracaoEm: data.ultima_interacao_em,
     };
+  }
+
+  // --------------------------------------------------------------------------
+  // EDITAIS, EVENTOS E BOLETIM
+  // --------------------------------------------------------------------------
+
+  /** Editais publicados com inscrição aberta em `hoje` (aaaa-mm-dd) ou em fluxo contínuo. */
+  async listarEditaisAbertos(hoje: string): Promise<EditalRecord[]> {
+    const { data, error } = await this.db()
+      .from('editais')
+      .select('*')
+      .eq('publicado', true)
+      .or(`inscricoes_ate.is.null,inscricoes_ate.gte.${hoje}`)
+      .order('inscricoes_ate', { ascending: true, nullsFirst: false })
+      .order('titulo', { ascending: true });
+
+    if (error) throw new Error(`Falha ao listar editais: ${error.message}`);
+    return (data ?? []).map(mapEditalRow);
+  }
+
+  /** Eventos publicados que ainda não terminaram em `agora` (instante ISO), do mais próximo ao mais distante. */
+  async listarProximosEventos(agora: string): Promise<EventoRecord[]> {
+    const { data, error } = await this.db()
+      .from('eventos')
+      .select('*')
+      .eq('publicado', true)
+      .gte('termina_em', agora)
+      .order('inicio', { ascending: true });
+
+    if (error) throw new Error(`Falha ao listar eventos: ${error.message}`);
+    return (data ?? []).map(mapEventoRow);
+  }
+
+  async buscarInscricaoBoletim(contato: string): Promise<InscricaoBoletimRecord | null> {
+    const { data, error } = await this.db()
+      .from('inscricoes_boletim')
+      .select('*')
+      .eq('contato', contato)
+      .maybeSingle();
+
+    if (error) throw new Error(`Falha ao consultar inscrição no boletim: ${error.message}`);
+    return data ? mapInscricaoBoletimRow(data) : null;
+  }
+
+  async criarInscricaoBoletim(input: {
+    contato: string;
+    tipoContato: TipoContatoBoletim;
+    origemCanal: CanalOrigem;
+  }): Promise<{ inscricao: InscricaoBoletimRecord | null; duplicada: boolean }> {
+    const { data, error } = await this.db()
+      .from('inscricoes_boletim')
+      .insert({
+        contato: input.contato,
+        tipo_contato: input.tipoContato,
+        consentimento_lgpd: true,
+        consentimento_em: new Date().toISOString(),
+        origem_canal: input.origemCanal,
+        ativo: true,
+      })
+      .select('*')
+      .single();
+
+    // 23505 = violação de unicidade: o mesmo contato foi inscrito em paralelo
+    if (error?.code === '23505') return { inscricao: null, duplicada: true };
+    if (error) throw new Error(`Falha ao registrar inscrição no boletim: ${error.message}`);
+    return { inscricao: mapInscricaoBoletimRow(data), duplicada: false };
+  }
+
+  async reativarInscricaoBoletim(id: string, origemCanal: CanalOrigem): Promise<InscricaoBoletimRecord> {
+    const { data, error } = await this.db()
+      .from('inscricoes_boletim')
+      .update({
+        ativo: true,
+        consentimento_lgpd: true,
+        consentimento_em: new Date().toISOString(),
+        origem_canal: origemCanal,
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) throw new Error(`Falha ao reativar inscrição no boletim: ${error.message}`);
+    return mapInscricaoBoletimRow(data);
   }
 }
 

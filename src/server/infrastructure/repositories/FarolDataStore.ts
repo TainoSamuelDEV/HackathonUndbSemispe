@@ -1,6 +1,8 @@
+import { hojeEmSaoLuis, instanteEmSaoLuis, somarDias } from '@/lib/datasSaoLuis';
 import type {
   CanalOrigem,
   EstadoConversaIA,
+  ModalidadeEvento,
   ModalidadeTrabalho,
   NivelEscolaridade,
   OrigemVaga,
@@ -12,6 +14,7 @@ import type {
   StatusInscricaoCurso,
   StatusTurma,
   StatusVaga,
+  TipoContatoBoletim,
   TipoContratacao,
   TipoCurso,
 } from '@/types/farol';
@@ -175,6 +178,55 @@ export interface ConversaWhatsAppRecord {
   atendimentoHumano: boolean;
   ultimaInteracaoEm: string;
 }
+
+export interface EditalRecord {
+  id: string;
+  titulo: string;
+  organizacao: string;
+  resumo: string;
+  publicoAlvo: string | null;
+  beneficio: string | null;
+  /** aaaa-mm-dd; nulo para chamadas em fluxo contínuo. */
+  inscricoesAte: string | null;
+  prazoDescricao: string | null;
+  linkUrl: string | null;
+  tags: string[];
+  seloSimulado: boolean;
+  publicado: boolean;
+}
+
+export interface EventoRecord {
+  id: string;
+  titulo: string;
+  organizacao: string;
+  resumo: string;
+  /** Instante ISO (UTC). */
+  inicio: string;
+  fim: string | null;
+  local: string;
+  modalidade: ModalidadeEvento;
+  gratuito: boolean;
+  linkInscricao: string | null;
+  tags: string[];
+  seloSimulado: boolean;
+  publicado: boolean;
+}
+
+export interface InscricaoBoletimRecord {
+  id: string;
+  /** Contato normalizado (e-mail em minúsculas ou WhatsApp só com dígitos). */
+  contato: string;
+  tipoContato: TipoContatoBoletim;
+  consentimentoLgpd: boolean;
+  consentimentoEm: string;
+  origemCanal: CanalOrigem;
+  ativo: boolean;
+  criadoEm: string;
+}
+
+// Datas do conteúdo de demonstração, relativas ao dia em que o servidor inicia (horário de São Luís)
+const HOJE_DEMO = hojeEmSaoLuis();
+const diaDemo = (dias: number) => somarDias(HOJE_DEMO, dias);
 
 // Senha de demonstração: "123456"
 const DEMO_SENHA_HASH = '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
@@ -511,6 +563,139 @@ class InMemoryFarolStore {
   ];
 
   public conversasWhatsApp: ConversaWhatsAppRecord[] = [];
+
+  // Mesmo conteúdo da migration 20261125000005_conteudo_exemplo_editais_eventos.sql
+  public editais: EditalRecord[] = [
+    {
+      id: '60000000-0000-0000-0000-000000000001',
+      titulo: 'CPSI Porto do Itaqui — Contratação Pública de Soluções Inovadoras',
+      organizacao: 'EMAP · Porto do Itaqui',
+      resumo:
+        'Chamada para startups e empresas apresentarem soluções tecnológicas para desafios logísticos, operacionais e de sustentabilidade do Porto do Itaqui.',
+      publicoAlvo: 'Startups, empresas e ICTs',
+      beneficio: 'Até R$ 100 mil por contrato',
+      inscricoesAte: null,
+      prazoDescricao: 'Chamada em fluxo contínuo',
+      linkUrl: 'https://www.portodoitaqui.com',
+      tags: ['Startups', 'Inovação aberta', 'Porto do Itaqui'],
+      seloSimulado: true,
+      publicado: true,
+    },
+    {
+      id: '60000000-0000-0000-0000-000000000002',
+      titulo: 'Residência em Inovação Portuária',
+      organizacao: 'FAPEMA · Porto do Itaqui',
+      resumo:
+        'Seleção de residentes para projetos de pesquisa aplicada e transformação digital no ecossistema portuário de São Luís, com duração de 12 meses.',
+      publicoAlvo: 'Estudantes e recém-formados',
+      beneficio: 'Bolsas de R$ 3.000 a R$ 5.500 por mês',
+      inscricoesAte: diaDemo(20),
+      prazoDescricao: null,
+      linkUrl: 'https://www.fapema.br',
+      tags: ['Bolsas', 'Pesquisa aplicada', 'Itaqui-Bacanga'],
+      seloSimulado: true,
+      publicado: true,
+    },
+    {
+      id: '60000000-0000-0000-0000-000000000003',
+      titulo: 'PISIM — Programa de Incubação de Startups Inova Maranhão',
+      organizacao: 'SECTI-MA · FAPEMA',
+      resumo:
+        'Programa estadual que acompanha startups maranhenses da validação da ideia ao mercado, com incubação, mentorias e rede de parceiros.',
+      publicoAlvo: 'Empreendedores e startups',
+      beneficio: 'Incubação e mentorias',
+      inscricoesAte: diaDemo(45),
+      prazoDescricao: null,
+      linkUrl: 'https://www.fapema.br',
+      tags: ['Incubação', 'Startups', 'Mentoria'],
+      seloSimulado: true,
+      publicado: true,
+    },
+    {
+      id: '60000000-0000-0000-0000-000000000004',
+      titulo: 'Banco de Talentos e Vagas de Estágio',
+      organizacao: 'IEL Maranhão · Sistema FIEMA',
+      resumo:
+        'Cadastro de estudantes de nível técnico e superior para oportunidades de estágio em empresas e indústrias do Maranhão.',
+      publicoAlvo: 'Estudantes de nível técnico e superior',
+      beneficio: 'Estágio remunerado',
+      inscricoesAte: null,
+      prazoDescricao: 'Cadastro em fluxo contínuo',
+      linkUrl: 'https://carreiras.iel.org.br',
+      tags: ['Estágio', 'Primeiro emprego', 'Indústria'],
+      seloSimulado: true,
+      publicado: true,
+    },
+  ];
+
+  public eventos: EventoRecord[] = [
+    {
+      id: '70000000-0000-0000-0000-000000000001',
+      titulo: 'Imersão Tech e IA na Prática',
+      organizacao: 'SECTI · SEBRAE · Comunidade Tech SLZ',
+      resumo:
+        'Oficinas práticas de inteligência artificial generativa e prototipagem rápida, com espaço para conexão entre estudantes, desenvolvedores e startups locais.',
+      inicio: instanteEmSaoLuis(diaDemo(6), '14:00'),
+      fim: instanteEmSaoLuis(diaDemo(6), '18:00'),
+      local: 'Centro Histórico, São Luís',
+      modalidade: 'PRESENCIAL',
+      gratuito: true,
+      linkInscricao: null,
+      tags: ['IA', 'Oficina', 'Networking'],
+      seloSimulado: true,
+      publicado: true,
+    },
+    {
+      id: '70000000-0000-0000-0000-000000000002',
+      titulo: 'Meetup Ecossistema SLZ: do código ao produto',
+      organizacao: 'Comunidades tech de São Luís',
+      resumo:
+        'Painel com fundadores de startups maranhenses sobre produto, contratação de talentos em início de carreira e oportunidades de mercado.',
+      inicio: instanteEmSaoLuis(diaDemo(9), '19:00'),
+      fim: instanteEmSaoLuis(diaDemo(9), '21:30'),
+      local: 'Parque Tecnológico de São Luís · Itaqui-Bacanga',
+      modalidade: 'PRESENCIAL',
+      gratuito: true,
+      linkInscricao: null,
+      tags: ['Startups', 'Comunidade', 'Carreira'],
+      seloSimulado: true,
+      publicado: true,
+    },
+    {
+      id: '70000000-0000-0000-0000-000000000003',
+      titulo: 'Encontro da Governança do Ecossistema de Inovação',
+      organizacao: 'SEMISPE e instituições parceiras',
+      resumo:
+        'Alinhamento dos grupos de trabalho de academia, empresas, governo e sociedade civil para o plano de ações de inovação da capital.',
+      inicio: instanteEmSaoLuis(diaDemo(14), '09:00'),
+      fim: instanteEmSaoLuis(diaDemo(14), '12:00'),
+      local: 'Cidade Operária, São Luís',
+      modalidade: 'HIBRIDO',
+      gratuito: true,
+      linkInscricao: null,
+      tags: ['Governança', 'Políticas públicas'],
+      seloSimulado: true,
+      publicado: true,
+    },
+    {
+      id: '70000000-0000-0000-0000-000000000004',
+      titulo: 'Trilha de Qualificação: negócios digitais e mercado de trabalho',
+      organizacao: 'SEMISPE',
+      resumo:
+        'Orientação sobre currículo, competências digitais mais procuradas pelas empresas de São Luís e caminhos para empreender.',
+      inicio: instanteEmSaoLuis(diaDemo(21), '18:30'),
+      fim: instanteEmSaoLuis(diaDemo(21), '20:30'),
+      local: 'Transmissão online',
+      modalidade: 'ONLINE',
+      gratuito: true,
+      linkInscricao: null,
+      tags: ['Qualificação', 'Empregabilidade'],
+      seloSimulado: true,
+      publicado: true,
+    },
+  ];
+
+  public inscricoesBoletim: InscricaoBoletimRecord[] = [];
 }
 
 const globalForFarol = globalThis as unknown as { __farolStore?: InMemoryFarolStore };
