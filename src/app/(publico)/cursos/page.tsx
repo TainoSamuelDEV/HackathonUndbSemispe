@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import type { CursoRecord } from '@/server/infrastructure/repositories/FarolDataStore';
 import { CursoCard } from '@/components/cards/CursoCard';
+import { CursoGridSkeleton } from '@/components/skeletons/CardSkeletons';
 
 export default function CursosPage() {
   const [cursos, setCursos] = useState<CursoRecord[]>([]);
+  const [carregando, setCarregando] = useState(true);
   const [temaPedido, setTemaPedido] = useState('');
   const [bairroPedido, setBairroPedido] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -13,7 +15,9 @@ export default function CursosPage() {
   useEffect(() => {
     fetch('/api/cursos')
       .then((r) => r.json())
-      .then((res) => setCursos(res?.data?.cursos ?? []));
+      .then((res) => setCursos(res?.data?.cursos ?? []))
+      .catch(() => setCursos([]))
+      .finally(() => setCarregando(false));
   }, []);
 
   async function enviarPedido(e: React.FormEvent) {
@@ -53,11 +57,24 @@ export default function CursosPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {cursos.map((curso) => (
-          <CursoCard key={curso.id} curso={curso} />
-        ))}
-      </div>
+      {carregando ? (
+        <CursoGridSkeleton />
+      ) : cursos.length === 0 ? (
+        <div className="border border-[#DCE7EF] rounded-[24px] p-10 text-center">
+          <p className="font-heading font-bold text-lg text-[#0B2540]">
+            Nenhum curso disponível no momento.
+          </p>
+          <p className="text-sm text-[#66788A] mt-2">
+            Use o formulário abaixo para pedir o curso que você precisa.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {cursos.map((curso) => (
+            <CursoCard key={curso.id} curso={curso} />
+          ))}
+        </div>
+      )}
 
       <div className="bg-[#F3F8FC] border border-[#DCE7EF] rounded-[16px] p-6 sm:p-8">
         <h2 className="font-heading text-2xl font-bold text-[#0B2540] mb-2">

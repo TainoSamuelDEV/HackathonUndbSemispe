@@ -3,22 +3,30 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { CheckCircle2, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, ArrowLeft, Building2, MapPin } from 'lucide-react';
 import type { ResultadoMatch } from '@/types/farol';
 import type { VagaRecord } from '@/server/infrastructure/repositories/FarolDataStore';
+import { capaDaVaga } from '@/lib/capaVaga';
+import { rotuloContratacao, rotuloModalidade } from '@/lib/rotulosVaga';
+import { CapaImagem } from '@/components/cards/CapaImagem';
+import { VagaDetalheSkeleton } from '@/components/skeletons/CardSkeletons';
 
 export default function VagaDetalhePage() {
   const params = useParams<{ id: string }>();
   const [vaga, setVaga] = useState<VagaRecord | null>(null);
+  const [carregando, setCarregando] = useState(true);
   const [match, setMatch] = useState<ResultadoMatch | null>(null);
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
+    setCarregando(true);
     fetch(`/api/vagas/${params.id}`)
       .then((r) => r.json())
-      .then((res) => setVaga(res?.data?.vaga ?? null));
+      .then((res) => setVaga(res?.data?.vaga ?? null))
+      .catch(() => setVaga(null))
+      .finally(() => setCarregando(false));
 
     fetch(`/api/vagas/${params.id}/match`)
       .then((r) => (r.ok ? r.json() : null))
@@ -49,13 +57,33 @@ export default function VagaDetalhePage() {
     }
   }
 
+  if (carregando) {
+    return <VagaDetalheSkeleton />;
+  }
+
   if (!vaga) {
     return (
-      <div className="max-w-[900px] mx-auto px-4 py-12">
-        <p className="text-sm text-[#66788A]">Carregando detalhes da vaga...</p>
+      <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 space-y-6">
+        <Link href="/vagas" className="inline-flex items-center gap-1 text-sm font-bold text-[#0162A7]">
+          <ArrowLeft className="w-4 h-4" /> Voltar para vagas
+        </Link>
+        <div className="border border-[#DCE7EF] rounded-[16px] p-8 sm:p-10 bg-white text-center space-y-3">
+          <h1 className="font-heading text-2xl font-extrabold text-[#0B2540]">Vaga não encontrada</h1>
+          <p className="text-sm text-[#66788A]">
+            Ela pode ter sido encerrada ou removida pela empresa.
+          </p>
+          <Link
+            href="/vagas"
+            className="inline-flex items-center justify-center min-h-[44px] px-6 rounded-[12px] bg-[#0162A7] text-white text-sm font-bold hover:bg-[#004F8A] transition-colors"
+          >
+            Ver vagas abertas
+          </Link>
+        </div>
       </div>
     );
   }
+
+  const capa = capaDaVaga(vaga);
 
   return (
     <div className="max-w-[900px] mx-auto px-4 sm:px-6 py-10 space-y-6">
@@ -63,21 +91,44 @@ export default function VagaDetalhePage() {
         <ArrowLeft className="w-4 h-4" /> Voltar para vagas
       </Link>
 
-      <div className="border border-[#DCE7EF] rounded-[16px] p-6 sm:p-8 bg-white space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#EFF7FC] text-[#0162A7]">
-            {vaga.modalidade} · {vaga.tipoContratacao}
-          </span>
-          {vaga.seloSimulado && (
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#FFF9E6] text-[#8E6416] border border-[#F0E3BF]">
-              Exemplo / Simulado
-            </span>
-          )}
+      <div className="border border-[#DCE7EF] rounded-[16px] p-6 sm:p-8 bg-white space-y-4 overflow-hidden">
+        {/* Imagem de fundo da vaga, no mesmo padrão do card (sangra até as bordas) */}
+        <div className="relative isolate -mx-6 -mt-6 sm:-mx-8 sm:-mt-8 aspect-video bg-[#0B2540]">
+          <CapaImagem src={capa.src} fallback={capa.fallback} prioridade className="-z-10" />
+          {/* Escurecimento para garantir leitura do texto sobre qualquer foto */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 -z-10 bg-gradient-to-t from-[#0B2540]/90 via-[#0B2540]/30 to-[#0B2540]/5"
+          />
+
+          <div className="absolute inset-0 flex flex-col justify-between p-5 sm:p-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-white text-[#0B2540] shadow-xs">
+                {rotuloModalidade(vaga.modalidade)}
+              </span>
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-white text-[#0162A7] shadow-xs">
+                {rotuloContratacao(vaga.tipoContratacao)}
+              </span>
+              {vaga.seloSimulado && (
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#0B2540] text-[#FADC00] ring-1 ring-white/20">
+                  Exemplo / Simulado
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 text-sm sm:text-base font-semibold text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.35)]">
+              <MapPin className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 text-[#FADC00]" />
+              <span>
+                {vaga.bairro}, {vaga.municipio} – MA
+              </span>
+            </div>
+          </div>
         </div>
 
         <h1 className="font-heading text-3xl font-extrabold text-[#0B2540]">{vaga.titulo}</h1>
-        <p className="text-sm font-semibold text-[#66788A]">
-          {vaga.empresaNome} · {vaga.bairro}, {vaga.municipio} – MA
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-[#66788A]">
+          <Building2 className="w-4 h-4 shrink-0 text-[#0162A7]" />
+          {vaga.empresaNome}
         </p>
 
         <p className="text-base text-[#0B2540] leading-relaxed pt-2">{vaga.descricao}</p>

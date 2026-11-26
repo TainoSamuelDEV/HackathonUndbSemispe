@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { VagaRecord } from '@/server/infrastructure/repositories/FarolDataStore';
+import { capaDaVaga, urlCapaValida } from '@/lib/capaVaga';
+import { CapaImagem } from '@/components/cards/CapaImagem';
 
 export default function PainelEmpresaPage() {
   const [vagas, setVagas] = useState<VagaRecord[]>([]);
@@ -10,7 +12,17 @@ export default function PainelEmpresaPage() {
   const [bairro, setBairro] = useState('Itaqui-Bacanga');
   const [descricao, setDescricao] = useState('');
   const [reqObrig, setReqObrig] = useState('');
+  const [imagemCapaUrl, setImagemCapaUrl] = useState('');
   const [mensagem, setMensagem] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const urlCapaDigitada = imagemCapaUrl.trim();
+  const urlCapaInvalida = urlCapaDigitada !== '' && !/^https:\/\/\S+$/i.test(urlCapaDigitada);
+  const capaPrevia = capaDaVaga({
+    imagemCapaUrl: !urlCapaInvalida && urlCapaValida(urlCapaDigitada) ? urlCapaDigitada : null,
+    area,
+    titulo,
+  });
 
   function carregar() {
     fetch('/api/empresa/vagas')
@@ -28,6 +40,11 @@ export default function PainelEmpresaPage() {
   async function publicar(e: React.FormEvent) {
     e.preventDefault();
     setMensagem(null);
+    setErro(null);
+    if (urlCapaInvalida) {
+      setErro('A imagem de capa precisa ser um endereço começando com https://');
+      return;
+    }
     const requisitos = reqObrig
       .split(',')
       .map((s) => s.trim())
@@ -46,6 +63,7 @@ export default function PainelEmpresaPage() {
         tipoContratacao: 'CLT',
         quantidadeVagas: 1,
         escolaridadeMinima: 'MEDIO_COMPLETO',
+        imagemCapaUrl: urlCapaDigitada || null,
         requisitos,
       }),
     });
@@ -53,8 +71,13 @@ export default function PainelEmpresaPage() {
       setTitulo('');
       setDescricao('');
       setReqObrig('');
+      setImagemCapaUrl('');
       setMensagem('Vaga publicada no catálogo público e sincronizada com a IA FAROL!');
       carregar();
+    } else {
+      const json = await resp.json().catch(() => null);
+      const erroCapa = json?.error?.details?.fieldErrors?.imagemCapaUrl?.[0];
+      setErro(erroCapa ?? json?.error?.message ?? 'Não foi possível publicar a vaga.');
     }
   }
 
@@ -114,6 +137,40 @@ export default function PainelEmpresaPage() {
           placeholder="Requisitos obrigatórios separados por vírgula (ex: Soldagem básica, Experiência em oficina)"
           className="w-full border border-[#DCE7EF] rounded-[12px] px-3.5 py-2.5 text-sm"
         />
+
+        {/* Imagem de capa (opcional) com prévia */}
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px] gap-3 items-start">
+          <div className="space-y-1.5">
+            <label htmlFor="vaga-capa" className="block text-xs font-bold text-[#0B2540]">
+              Imagem de capa (opcional)
+            </label>
+            <input
+              id="vaga-capa"
+              type="url"
+              inputMode="url"
+              value={imagemCapaUrl}
+              onChange={(e) => setImagemCapaUrl(e.target.value)}
+              placeholder="https://..."
+              aria-invalid={urlCapaInvalida}
+              aria-describedby="vaga-capa-ajuda"
+              className={`w-full border rounded-[12px] px-3.5 py-2.5 text-sm ${
+                urlCapaInvalida ? 'border-[#B53832]' : 'border-[#DCE7EF]'
+              }`}
+            />
+            <p id="vaga-capa-ajuda" className={`text-xs ${urlCapaInvalida ? 'text-[#B53832]' : 'text-[#66788A]'}`}>
+              {urlCapaInvalida
+                ? 'Use um endereço que comece com https://'
+                : 'Sem imagem, a vaga usa automaticamente uma foto da área informada.'}
+            </p>
+          </div>
+          <div className="relative aspect-video rounded-[12px] overflow-hidden bg-[#0B2540]">
+            <CapaImagem src={capaPrevia.src} fallback={capaPrevia.fallback} />
+            <span className="absolute left-2 bottom-2 px-2 py-0.5 rounded-full bg-white/90 text-[10px] font-bold text-[#0B2540]">
+              Prévia da capa
+            </span>
+          </div>
+        </div>
+
         <button
           type="submit"
           className="w-full sm:w-auto min-h-[44px] px-6 rounded-[12px] bg-[#0162A7] text-white font-bold text-sm"
@@ -121,6 +178,7 @@ export default function PainelEmpresaPage() {
           Publicar vaga
         </button>
         {mensagem && <p className="text-xs font-bold text-[#0A7B36]">{mensagem}</p>}
+        {erro && <p className="text-xs font-bold text-[#B53832]">{erro}</p>}
       </form>
 
       <div className="border border-[#DCE7EF] rounded-[16px] p-4 sm:p-6 bg-white space-y-3">
