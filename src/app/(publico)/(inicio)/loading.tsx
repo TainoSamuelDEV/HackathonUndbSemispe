@@ -7,16 +7,8 @@ export default function CarregandoInicio() {
     <div role="status" aria-label="Carregando página inicial" className="bg-white">
       {/* HERO — mesma compensação do header flutuante e mesma altura da mídia */}
       <section className="relative bg-white -mt-[72px] sm:-mt-[76px]">
-        <div className="relative h-[340px] sm:h-[480px] lg:h-[620px] overflow-hidden">
-          <Skeleton className="absolute inset-0" />
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 1440 320"
-            preserveAspectRatio="none"
-            className="absolute inset-x-0 bottom-0 w-full h-[96px] sm:h-[170px] lg:h-[250px]"
-          >
-            <path d="M0 78C290 30 610 46 850 150C1080 248 1275 256 1440 158V320H0Z" fill="#ffffff" />
-          </svg>
+        <div className="relative h-[340px] sm:h-[480px] lg:h-[620px]">
+          <Skeleton className="mascara-onda-hero absolute inset-0" />
         </div>
 
         <div className="relative max-w-[1200px] mx-auto px-4 sm:px-6 -mt-2 sm:-mt-20 lg:-mt-40 pb-12 sm:pb-16">

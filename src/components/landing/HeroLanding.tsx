@@ -40,34 +40,23 @@ export function HeroLanding({
     // -mt compensa a altura do header flutuante para a mídia começar no topo da página
     <section className="relative bg-white -mt-[72px] sm:-mt-[76px]">
       {/* MÍDIA */}
-      <div className="relative h-[340px] sm:h-[480px] lg:h-[620px] overflow-hidden bg-[#0B2540]">
-        {/* Vídeo de fundo (pessoas conversando, se conectando e estudando) */}
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="metadata"
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover object-[center_35%]"
-        >
-          <source src="/videos/hero-farol.mp4" type="video/mp4" />
-        </video>
-        {/* Leve escurecimento no topo para dar profundidade atrás do header */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-b from-[#0B2540]/45 via-[#0B2540]/10 to-transparent"
-        />
-
-        {/* Onda branca que recorta a mídia */}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 1440 320"
-          preserveAspectRatio="none"
-          className="absolute inset-x-0 bottom-0 w-full h-[96px] sm:h-[170px] lg:h-[250px]"
-        >
-          <path d="M0 78C290 30 610 46 850 150C1080 248 1275 256 1440 158V320H0Z" fill="#ffffff" />
-        </svg>
+      <div className="relative h-[340px] sm:h-[480px] lg:h-[620px]">
+        {/* Base recortada em onda pela máscara (ver .mascara-onda-hero em globals.css) */}
+        <div aria-hidden="true" className="mascara-onda-hero absolute inset-0 overflow-hidden bg-[#0B2540]">
+          {/* Vídeo de fundo (pessoas conversando, se conectando e estudando) */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 h-full w-full object-cover object-[center_35%]"
+          >
+            <source src="/videos/hero-farol.mp4" type="video/mp4" />
+          </video>
+          {/* Leve escurecimento no topo para dar profundidade atrás do header */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0B2540]/45 via-[#0B2540]/10 to-transparent" />
+        </div>
 
         {/* Cartão flutuante: vaga mais recente (dado real) */}
         {vagaRecente && (
