@@ -7,6 +7,19 @@ import {
   RegraNegocioError,
   ValidacaoError,
 } from '@/server/domain/errors/DomainError';
+import {
+  gerarVariacoesTelefoneWhatsApp,
+  normalizarTelefoneWhatsApp,
+} from '@/server/domain/ai/Guardrails';
+import {
+  type CurriculoArquivoMetadata,
+  type CurriculoArquivoRecord,
+  type CurriculoPadraoData,
+  mesclarCurriculoPadrao,
+  montarCurriculoDeCandidato,
+  sanitizarCurriculoPadrao,
+} from '@/server/domain/curriculo/CurriculoPadrao';
+import { gerarCurriculoPadraoPdf } from '@/server/domain/curriculo/CurriculoPdfGenerator';
 import { normalizarContatoBoletim } from '@/server/domain/boletim/contatoBoletim';
 import { hojeEmSaoLuis } from '@/lib/datasSaoLuis';
 import {
@@ -18,6 +31,7 @@ import {
   type EditalRecord,
   type EventoRecord,
   type InscricaoCursoRecord,
+  type MensagemWhatsAppRecord,
   type PedidoCursoRecord,
   type VagaRecord,
 } from '@/server/infrastructure/repositories/FarolDataStore';
@@ -130,6 +144,61 @@ export class FarolService {
       throw new RegraNegocioError('Este e-mail já está cadastrado.');
     }
 
+    const telefoneNorm = input.telefoneWhatsapp
+      ? normalizarTelefoneWhatsApp(input.telefoneWhatsapp)
+      : null;
+    const nomeExibicao = input.nomeCompleto.trim().split(/\s+/).slice(0, 2).join(' ');
+
+    if (telefoneNorm) {
+      const variacoes = gerarVariacoesTelefoneWhatsApp(telefoneNorm);
+      const usuarioWa = farolMemoryStore.usuarios.find(
+        (u) => !u.email && u.telefoneWhatsapp && variacoes.includes(u.telefoneWhatsapp)
+      );
+      if (usuarioWa) {
+        usuarioWa.email = emailNorm;
+        usuarioWa.senhaHash = senhaHash;
+        usuarioWa.telefoneWhatsapp = telefoneNorm;
+
+        let candWa = farolMemoryStore.candidatos.find((c) => c.usuarioId === usuarioWa.id);
+        if (candWa) {
+          candWa.nomeCompleto = input.nomeCompleto.trim();
+          candWa.nomeExibicao = nomeExibicao;
+          candWa.bairro = input.bairro.trim();
+        } else {
+          candWa = {
+            id: crypto.randomUUID(),
+            usuarioId: usuarioWa.id,
+            nomeCompleto: input.nomeCompleto.trim(),
+            nomeExibicao,
+            bairro: input.bairro.trim(),
+            municipio: 'São Luís',
+            escolaridade: null,
+            areaInteresse: null,
+            objetivo: null,
+            resumoProfissional: null,
+            disponibilidade: null,
+            consentimentoLgpd: true,
+            consentimentoEm: new Date().toISOString(),
+            visivelServicos: false,
+            categoriaServicos: null,
+            competencias: [],
+            experiencias: [],
+          };
+          farolMemoryStore.candidatos.push(candWa);
+        }
+
+        const sessao: UsuarioSessao = {
+          id: usuarioWa.id,
+          email: emailNorm,
+          papel: 'CANDIDATO',
+          nome: nomeExibicao,
+          candidatoId: candWa.id,
+          whatsappVerificado: usuarioWa.whatsappVerificado,
+        };
+        return { token: assinarTokenSessao(sessao), sessao };
+      }
+    }
+
     const usuarioId = crypto.randomUUID();
     const candidatoId = crypto.randomUUID();
 
@@ -138,12 +207,11 @@ export class FarolService {
       email: emailNorm,
       senhaHash,
       papel: 'CANDIDATO',
-      telefoneWhatsapp: input.telefoneWhatsapp || null,
+      telefoneWhatsapp: telefoneNorm || null,
       whatsappVerificado: false,
       ativo: true,
     });
 
-    const nomeExibicao = input.nomeCompleto.trim().split(/\s+/).slice(0, 2).join(' ');
     farolMemoryStore.candidatos.push({
       id: candidatoId,
       usuarioId,
@@ -842,31 +910,313 @@ export class FarolService {
   }
 
   // --------------------------------------------------------------------------
-  // CONVERSA WHATSAPP (IA FAROL)
+  // CONVERSA WHATSAPP (IA FAROL) & CURRÍCULO PADRÃO
   // --------------------------------------------------------------------------
 
-  async obterOuCriarConversaWhatsApp(telefone: string): Promise<ConversaWhatsAppRecord> {
+  async buscarCandidatoPorTelefone(telefone: string): Promise<{
+    candidato: CandidatoRecord;
+    email: string | null;
+    telefoneWhatsapp: string | null;
+  } | null> {
     if (this.usarSupabase()) {
-      return supabaseFarolRepo.obterOuCriarConversaWhatsApp(telefone);
+      return supabaseFarolRepo.buscarCandidatoPorTelefone(telefone);
     }
 
-    let conv = farolMemoryStore.conversasWhatsApp.find((c) => c.telefone === telefone);
+    const variacoes = gerarVariacoesTelefoneWhatsApp(telefone);
+    if (variacoes.length === 0) return null;
+
+    const usuario = farolMemoryStore.usuarios.find(
+      (u) => u.telefoneWhatsapp && variacoes.includes(u.telefoneWhatsapp)
+    );
+    if (!usuario) return null;
+
+    const candidato = farolMemoryStore.candidatos.find((c) => c.usuarioId === usuario.id);
+    if (!candidato) return null;
+
+    return {
+      candidato,
+      email: usuario.email,
+      telefoneWhatsapp: usuario.telefoneWhatsapp,
+    };
+  }
+
+  async garantirCandidatoPorWhatsApp(input: {
+    telefone: string;
+    dados: CurriculoPadraoData;
+  }): Promise<CandidatoRecord> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.garantirCandidatoPorWhatsApp(input);
+    }
+
+    const telefoneNorm = normalizarTelefoneWhatsApp(input.telefone);
+    const dadosLimpos = sanitizarCurriculoPadrao(input.dados);
+    const existente = await this.buscarCandidatoPorTelefone(telefoneNorm);
+
+    const nomeCompleto = dadosLimpos.nomeCompleto || existente?.candidato.nomeCompleto || 'Cidadão FAROL';
+    const nomeExibicao = nomeCompleto.trim().split(/\s+/).slice(0, 2).join(' ');
+    const bairro = dadosLimpos.bairro || existente?.candidato.bairro || 'São Luís';
+
+    const experienciasMapped = dadosLimpos.experiencias.map((exp, idx) => ({
+      id: `exp-${idx + 1}`,
+      cargoAtividade: exp.cargo,
+      empresaOuContexto: exp.empresa ?? null,
+      trabalhoInformal: Boolean(exp.trabalhoInformal),
+      periodo: [exp.periodo, exp.descricao].filter(Boolean).join(' — ') || null,
+    }));
+
+    if (existente) {
+      return this.atualizarCurriculoCandidato(existente.candidato.id, {
+        nomeCompleto,
+        nomeExibicao,
+        bairro,
+        escolaridade: dadosLimpos.escolaridade ?? existente.candidato.escolaridade,
+        areaInteresse: dadosLimpos.areaInteresse ?? existente.candidato.areaInteresse,
+        objetivo: dadosLimpos.objetivo ?? existente.candidato.objetivo,
+        resumoProfissional: dadosLimpos.resumoProfissional ?? existente.candidato.resumoProfissional,
+        disponibilidade: dadosLimpos.disponibilidade ?? existente.candidato.disponibilidade,
+        competencias:
+          dadosLimpos.competencias.length > 0
+            ? dadosLimpos.competencias
+            : existente.candidato.competencias,
+        experiencias:
+          experienciasMapped.length > 0 ? experienciasMapped : existente.candidato.experiencias,
+      });
+    }
+
+    const usuarioId = crypto.randomUUID();
+    const candidatoId = crypto.randomUUID();
+
+    farolMemoryStore.usuarios.push({
+      id: usuarioId,
+      email: null,
+      senhaHash: null,
+      papel: 'CANDIDATO',
+      telefoneWhatsapp: telefoneNorm,
+      whatsappVerificado: true,
+      ativo: true,
+    });
+
+    const novoCandidato: CandidatoRecord = {
+      id: candidatoId,
+      usuarioId,
+      nomeCompleto,
+      nomeExibicao,
+      bairro,
+      municipio: dadosLimpos.municipio || 'São Luís',
+      escolaridade: dadosLimpos.escolaridade ?? null,
+      areaInteresse: dadosLimpos.areaInteresse ?? null,
+      objetivo: dadosLimpos.objetivo ?? null,
+      resumoProfissional: dadosLimpos.resumoProfissional ?? null,
+      disponibilidade: dadosLimpos.disponibilidade ?? null,
+      consentimentoLgpd: true,
+      consentimentoEm: new Date().toISOString(),
+      visivelServicos: false,
+      categoriaServicos: null,
+      competencias: dadosLimpos.competencias,
+      experiencias: experienciasMapped,
+    };
+
+    farolMemoryStore.candidatos.push(novoCandidato);
+    return novoCandidato;
+  }
+
+  async salvarCurriculoArquivo(input: {
+    candidatoId: string;
+    origem: 'UPLOAD_PDF' | 'UPLOAD_IMAGEM' | 'GERADO_SISTEMA';
+    nomeArquivo: string;
+    mimeType: string;
+    arquivoBase64: string;
+    dadosExtraidosJson: Record<string, unknown> | null;
+    confirmadoUsuario: boolean;
+  }): Promise<CurriculoArquivoRecord> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.salvarCurriculoArquivo(input);
+    }
+
+    const id = crypto.randomUUID();
+    const arquivoUrl = `/api/candidato/curriculo/arquivos/${id}/download`;
+    const record: CurriculoArquivoRecord = {
+      id,
+      candidatoId: input.candidatoId,
+      origem: input.origem,
+      arquivoUrl,
+      nomeArquivo: input.nomeArquivo,
+      mimeType: input.mimeType,
+      arquivoBase64: input.arquivoBase64,
+      dadosExtraidosJson: input.dadosExtraidosJson,
+      confirmadoUsuario: input.confirmadoUsuario,
+      criadoEm: new Date().toISOString(),
+    };
+    farolMemoryStore.curriculosArquivos.unshift(record);
+    return record;
+  }
+
+  async listarCurriculosArquivosDoCandidato(candidatoId: string): Promise<CurriculoArquivoMetadata[]> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.listarCurriculosArquivosDoCandidato(candidatoId);
+    }
+
+    return farolMemoryStore.curriculosArquivos
+      .filter((a) => a.candidatoId === candidatoId)
+      .map(({ arquivoBase64: _omit, ...meta }) => meta);
+  }
+
+  async obterCurriculoArquivoPorId(arquivoId: string): Promise<CurriculoArquivoRecord | null> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.obterCurriculoArquivoPorId(arquivoId);
+    }
+    return farolMemoryStore.curriculosArquivos.find((a) => a.id === arquivoId) ?? null;
+  }
+
+  async gerarEAnexarCurriculoPadrao(input: {
+    candidatoId?: string | null;
+    telefone?: string | null;
+    dados?: Partial<CurriculoPadraoData>;
+    origemCanal: CanalOrigem;
+  }): Promise<{
+    candidato: CandidatoRecord;
+    arquivo: CurriculoArquivoRecord;
+    pdfBase64: string;
+    fileName: string;
+    dadosFinais: CurriculoPadraoData;
+  }> {
+    let candidatoExistente: CandidatoRecord | null = null;
+    let contato: { telefone?: string | null; email?: string | null } = {
+      telefone: input.telefone ?? null,
+    };
+
+    if (input.candidatoId) {
+      candidatoExistente = await this.obterCandidato(input.candidatoId);
+      if (!this.usarSupabase()) {
+        const usuario = farolMemoryStore.usuarios.find(
+          (u) => u.id === candidatoExistente?.usuarioId
+        );
+        contato = {
+          telefone: usuario?.telefoneWhatsapp ?? input.telefone ?? null,
+          email: usuario?.email ?? null,
+        };
+      }
+    } else if (input.telefone) {
+      const encontrado = await this.buscarCandidatoPorTelefone(input.telefone);
+      if (encontrado) {
+        candidatoExistente = encontrado.candidato;
+        contato = {
+          telefone: encontrado.telefoneWhatsapp ?? input.telefone,
+          email: encontrado.email,
+        };
+      }
+    }
+
+    const base = candidatoExistente ? montarCurriculoDeCandidato(candidatoExistente, contato) : {};
+    const dadosFinais = mesclarCurriculoPadrao(base, {
+      ...input.dados,
+      ...(contato.telefone ? { telefoneWhatsApp: contato.telefone } : {}),
+      ...(contato.email ? { email: contato.email } : {}),
+    });
+
+    if (!dadosFinais.nomeCompleto) {
+      throw new ValidacaoError('Informe o nome completo para gerar o currículo padrão.');
+    }
+
+    let candidato: CandidatoRecord;
+    if (candidatoExistente) {
+      const experienciasMapped = dadosFinais.experiencias.map((exp, idx) => ({
+        id: `exp-${idx + 1}`,
+        cargoAtividade: exp.cargo,
+        empresaOuContexto: exp.empresa ?? null,
+        trabalhoInformal: Boolean(exp.trabalhoInformal),
+        periodo: [exp.periodo, exp.descricao].filter(Boolean).join(' — ') || null,
+      }));
+      candidato = await this.atualizarCurriculoCandidato(candidatoExistente.id, {
+        nomeCompleto: dadosFinais.nomeCompleto,
+        nomeExibicao: dadosFinais.nomeCompleto.split(/\s+/).slice(0, 2).join(' '),
+        bairro: dadosFinais.bairro || candidatoExistente.bairro,
+        escolaridade: dadosFinais.escolaridade ?? candidatoExistente.escolaridade,
+        areaInteresse: dadosFinais.areaInteresse ?? candidatoExistente.areaInteresse,
+        objetivo: dadosFinais.objetivo ?? candidatoExistente.objetivo,
+        resumoProfissional: dadosFinais.resumoProfissional ?? candidatoExistente.resumoProfissional,
+        disponibilidade: dadosFinais.disponibilidade ?? candidatoExistente.disponibilidade,
+        competencias: dadosFinais.competencias,
+        experiencias: experienciasMapped,
+      });
+    } else if (input.telefone) {
+      candidato = await this.garantirCandidatoPorWhatsApp({
+        telefone: input.telefone,
+        dados: dadosFinais,
+      });
+    } else {
+      throw new ValidacaoError('Candidato ou telefone é obrigatório para gerar currículo.');
+    }
+
+    const pdf = gerarCurriculoPadraoPdf(dadosFinais);
+    const arquivo = await this.salvarCurriculoArquivo({
+      candidatoId: candidato.id,
+      origem: 'GERADO_SISTEMA',
+      nomeArquivo: pdf.fileName,
+      mimeType: pdf.mimeType,
+      arquivoBase64: pdf.base64,
+      dadosExtraidosJson: {
+        ...dadosFinais,
+        canalOrigem: input.origemCanal,
+        geradoEm: new Date().toISOString(),
+      },
+      confirmadoUsuario: true,
+    });
+
+    return {
+      candidato,
+      arquivo,
+      pdfBase64: pdf.base64,
+      fileName: pdf.fileName,
+      dadosFinais,
+    };
+  }
+
+  async obterOuCriarConversaWhatsApp(
+    telefone: string,
+    meta?: { remoteJid?: string; pushName?: string }
+  ): Promise<ConversaWhatsAppRecord> {
+    const telefoneNorm = normalizarTelefoneWhatsApp(telefone);
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.obterOuCriarConversaWhatsApp(telefoneNorm, meta);
+    }
+
+    let conv = farolMemoryStore.conversasWhatsApp.find((c) => c.telefone === telefoneNorm);
     if (!conv) {
-      const usuario = farolMemoryStore.usuarios.find((u) => u.telefoneWhatsapp === telefone);
+      const variacoes = gerarVariacoesTelefoneWhatsApp(telefoneNorm);
+      const usuario = farolMemoryStore.usuarios.find(
+        (u) => u.telefoneWhatsapp && variacoes.includes(u.telefoneWhatsapp)
+      );
       const candidato = usuario
         ? farolMemoryStore.candidatos.find((c) => c.usuarioId === usuario.id)
         : undefined;
 
       conv = {
         id: crypto.randomUUID(),
-        telefone,
+        telefone: telefoneNorm,
+        remoteJid: meta?.remoteJid ?? null,
+        pushName: meta?.pushName ?? null,
         candidatoId: candidato?.id ?? null,
         estadoAtual: candidato?.consentimentoLgpd ? 'MATCH' : 'NOVO',
         contextoJson: {},
         atendimentoHumano: false,
+        botPausedUntil: null,
+        topicoAtual: null,
+        turnosSessao: 0,
         ultimaInteracaoEm: new Date().toISOString(),
       };
       farolMemoryStore.conversasWhatsApp.push(conv);
+    } else {
+      if (meta?.remoteJid) conv.remoteJid = meta.remoteJid;
+      if (meta?.pushName) conv.pushName = meta.pushName;
+      if (conv.botPausedUntil && new Date(conv.botPausedUntil).getTime() <= Date.now()) {
+        conv.botPausedUntil = null;
+        conv.atendimentoHumano = false;
+      }
+      if (!conv.candidatoId) {
+        const encontrado = await this.buscarCandidatoPorTelefone(telefoneNorm);
+        if (encontrado?.candidato.id) conv.candidatoId = encontrado.candidato.id;
+      }
     }
     return conv;
   }
@@ -877,16 +1227,17 @@ export class FarolService {
     contextoPatch?: Record<string, unknown>,
     atendimentoHumano?: boolean
   ): Promise<ConversaWhatsAppRecord> {
+    const telefoneNorm = normalizarTelefoneWhatsApp(telefone);
     if (this.usarSupabase()) {
       return supabaseFarolRepo.atualizarEstadoConversaWhatsApp(
-        telefone,
+        telefoneNorm,
         estadoAtual,
         contextoPatch,
         atendimentoHumano
       );
     }
 
-    const conv = await this.obterOuCriarConversaWhatsApp(telefone);
+    const conv = await this.obterOuCriarConversaWhatsApp(telefoneNorm);
     conv.estadoAtual = estadoAtual;
     if (contextoPatch) {
       conv.contextoJson = { ...conv.contextoJson, ...contextoPatch };
@@ -896,6 +1247,107 @@ export class FarolService {
     }
     conv.ultimaInteracaoEm = new Date().toISOString();
     return conv;
+  }
+
+  async mensagemWhatsAppJaProcessada(evolutionMessageId: string): Promise<boolean> {
+    if (!evolutionMessageId) return false;
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.mensagemWhatsAppJaProcessada(evolutionMessageId);
+    }
+    return farolMemoryStore.mensagensWhatsApp.some(
+      (m) => m.evolutionMessageId === evolutionMessageId
+    );
+  }
+
+  async salvarMensagemWhatsApp(input: {
+    conversaId: string;
+    direcao: 'ENTRADA' | 'SAIDA';
+    tipoMidia: 'TEXTO' | 'AUDIO' | 'DOCUMENTO' | 'IMAGEM';
+    conteudoTexto?: string | null;
+    transcricaoAudio?: string | null;
+    resumoMidia?: string | null;
+    metadataJson?: Record<string, unknown>;
+    evolutionMessageId?: string | null;
+  }): Promise<boolean> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.salvarMensagemWhatsApp(input);
+    }
+
+    if (
+      input.evolutionMessageId &&
+      farolMemoryStore.mensagensWhatsApp.some((m) => m.evolutionMessageId === input.evolutionMessageId)
+    ) {
+      return false;
+    }
+
+    farolMemoryStore.mensagensWhatsApp.push({
+      id: crypto.randomUUID(),
+      conversaId: input.conversaId,
+      direcao: input.direcao,
+      tipoMidia: input.tipoMidia,
+      conteudoTexto: input.conteudoTexto ?? null,
+      transcricaoAudio: input.transcricaoAudio ?? null,
+      resumoMidia: input.resumoMidia ?? null,
+      metadataJson: input.metadataJson ?? {},
+      evolutionMessageId: input.evolutionMessageId ?? null,
+      criadoEm: new Date().toISOString(),
+    });
+    return true;
+  }
+
+  async listarHistoricoMensagensWhatsApp(
+    conversaId: string,
+    limite = 40,
+    ttlMinutos = 10080
+  ): Promise<MensagemWhatsAppRecord[]> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.listarHistoricoMensagensWhatsApp(conversaId, limite, ttlMinutos);
+    }
+
+    const cutoff = Date.now() - ttlMinutos * 60_000;
+    return farolMemoryStore.mensagensWhatsApp
+      .filter((m) => m.conversaId === conversaId && new Date(m.criadoEm).getTime() >= cutoff)
+      .slice(-limite);
+  }
+
+  async pausarBotConversaWhatsApp(telefone: string, minutos: number): Promise<void> {
+    const telefoneNorm = normalizarTelefoneWhatsApp(telefone);
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.pausarBotConversaWhatsApp(telefoneNorm, minutos);
+    }
+
+    const conv = await this.obterOuCriarConversaWhatsApp(telefoneNorm);
+    conv.botPausedUntil = new Date(Date.now() + minutos * 60_000).toISOString();
+    conv.atendimentoHumano = true;
+    conv.estadoAtual = 'ATENDIMENTO_HUMANO';
+    conv.ultimaInteracaoEm = new Date().toISOString();
+  }
+
+  async atualizarTopicoConversaWhatsApp(conversaId: string, topico: string | null): Promise<void> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.atualizarTopicoConversaWhatsApp(conversaId, topico);
+    }
+    const conv = farolMemoryStore.conversasWhatsApp.find((c) => c.id === conversaId);
+    if (conv) conv.topicoAtual = topico;
+  }
+
+  async vincularCandidatoConversaWhatsApp(conversaId: string, candidatoId: string): Promise<void> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.vincularCandidatoConversaWhatsApp(conversaId, candidatoId);
+    }
+    const conv = farolMemoryStore.conversasWhatsApp.find((c) => c.id === conversaId);
+    if (conv) conv.candidatoId = candidatoId;
+  }
+
+  async incrementarTurnoConversaWhatsApp(conversaId: string): Promise<void> {
+    if (this.usarSupabase()) {
+      return supabaseFarolRepo.incrementarTurnoConversaWhatsApp(conversaId);
+    }
+    const conv = farolMemoryStore.conversasWhatsApp.find((c) => c.id === conversaId);
+    if (conv) {
+      conv.turnosSessao = (conv.turnosSessao ?? 0) + 1;
+      conv.ultimaInteracaoEm = new Date().toISOString();
+    }
   }
 }
 

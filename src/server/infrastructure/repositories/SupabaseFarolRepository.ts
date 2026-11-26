@@ -1,4 +1,14 @@
 import { getSupabaseAdmin } from '@/server/infrastructure/supabase/client';
+import {
+  gerarVariacoesTelefoneWhatsApp,
+  normalizarTelefoneWhatsApp,
+} from '@/server/domain/ai/Guardrails';
+import {
+  type CurriculoArquivoMetadata,
+  type CurriculoArquivoRecord,
+  type CurriculoPadraoData,
+  sanitizarCurriculoPadrao,
+} from '@/server/domain/curriculo/CurriculoPadrao';
 import { normalizarTexto } from '@/server/domain/matching/MatchEngine';
 import {
   RecursoNaoEncontradoError,
@@ -13,6 +23,7 @@ import type {
   EventoRecord,
   InscricaoBoletimRecord,
   InscricaoCursoRecord,
+  MensagemWhatsAppRecord,
   PedidoCursoRecord,
   UsuarioRecord,
   VagaRecord,
@@ -201,13 +212,75 @@ export class SupabaseFarolRepository {
     const existente = await this.buscarUsuarioPorEmail(emailNorm);
     if (existente) throw new RegraNegocioError('Este e-mail já está cadastrado.');
 
+    const telefoneNorm = input.telefoneWhatsapp
+      ? normalizarTelefoneWhatsApp(input.telefoneWhatsapp)
+      : null;
+    const nomeExibicao = input.nomeCompleto.trim().split(/\s+/).slice(0, 2).join(' ');
+
+    // Se o cidadão já interagiu e gerou currículo pelo WhatsApp (usuário sem e-mail), reivindica a conta
+    if (telefoneNorm) {
+      const variacoes = gerarVariacoesTelefoneWhatsApp(telefoneNorm);
+      if (variacoes.length > 0) {
+        const { data: usuarioWa } = await this.db()
+          .from('usuarios')
+          .select('id, email, candidatos(id)')
+          .in('telefone_whatsapp', variacoes)
+          .is('email', null)
+          .limit(1)
+          .maybeSingle();
+
+        if (usuarioWa) {
+          const { error: updUserErr } = await this.db()
+            .from('usuarios')
+            .update({
+              email: emailNorm,
+              senha_hash: input.senhaHash,
+              telefone_whatsapp: telefoneNorm,
+            })
+            .eq('id', usuarioWa.id);
+          if (updUserErr) throw new RegraNegocioError(updUserErr.message);
+
+          const candWa = Array.isArray(usuarioWa.candidatos)
+            ? usuarioWa.candidatos[0]
+            : usuarioWa.candidatos;
+
+          if (candWa?.id) {
+            await this.db()
+              .from('candidatos')
+              .update({
+                nome_completo: input.nomeCompleto.trim(),
+                nome_exibicao: nomeExibicao,
+                bairro: input.bairro.trim(),
+              })
+              .eq('id', candWa.id);
+            return { usuarioId: usuarioWa.id, candidatoId: candWa.id, nomeExibicao };
+          }
+
+          const { data: novoCand, error: novoCandErr } = await this.db()
+            .from('candidatos')
+            .insert({
+              usuario_id: usuarioWa.id,
+              nome_completo: input.nomeCompleto.trim(),
+              nome_exibicao: nomeExibicao,
+              bairro: input.bairro.trim(),
+              consentimento_lgpd: true,
+              consentimento_em: new Date().toISOString(),
+            })
+            .select('id')
+            .single();
+          if (novoCandErr) throw new RegraNegocioError(novoCandErr.message);
+          return { usuarioId: usuarioWa.id, candidatoId: novoCand.id, nomeExibicao };
+        }
+      }
+    }
+
     const { data: user, error: uErr } = await this.db()
       .from('usuarios')
       .insert({
         email: emailNorm,
         senha_hash: input.senhaHash,
         papel: 'CANDIDATO',
-        telefone_whatsapp: input.telefoneWhatsapp || null,
+        telefone_whatsapp: telefoneNorm || null,
         whatsapp_verificado: false,
       })
       .select('id')
@@ -215,7 +288,6 @@ export class SupabaseFarolRepository {
 
     if (uErr) throw new RegraNegocioError(uErr.message);
 
-    const nomeExibicao = input.nomeCompleto.trim().split(/\s+/).slice(0, 2).join(' ');
     const { data: cand, error: cErr } = await this.db()
       .from('candidatos')
       .insert({
@@ -407,7 +479,229 @@ export class SupabaseFarolRepository {
       }
     }
 
+    if (dados.experiencias !== undefined) {
+      await this.db().from('experiencias_profissionais').delete().eq('candidato_id', candidatoId);
+      const expValidas = dados.experiencias.filter((e) => e.cargoAtividade?.trim());
+      if (expValidas.length > 0) {
+        const { error: expErr } = await this.db()
+          .from('experiencias_profissionais')
+          .insert(
+            expValidas.map((e) => ({
+              candidato_id: candidatoId,
+              cargo_atividade: e.cargoAtividade.trim(),
+              empresa_ou_contexto: e.empresaOuContexto?.trim() || null,
+              trabalho_informal: Boolean(e.trabalhoInformal),
+              descricao: e.periodo?.trim() || null,
+            }))
+          );
+        if (expErr) throw new Error(expErr.message);
+      }
+    }
+
     return this.obterCandidato(candidatoId);
+  }
+
+  async buscarCandidatoPorTelefone(telefone: string): Promise<{
+    candidato: CandidatoRecord;
+    email: string | null;
+    telefoneWhatsapp: string | null;
+  } | null> {
+    const variacoes = gerarVariacoesTelefoneWhatsApp(telefone);
+    if (variacoes.length === 0) return null;
+
+    const { data: usuario, error } = await this.db()
+      .from('usuarios')
+      .select('id, email, telefone_whatsapp, candidatos(id)')
+      .in('telefone_whatsapp', variacoes)
+      .order('criado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!usuario) return null;
+
+    const cand = Array.isArray(usuario.candidatos) ? usuario.candidatos[0] : usuario.candidatos;
+    if (!cand?.id) return null;
+
+    const candidato = await this.obterCandidato(cand.id);
+    return {
+      candidato,
+      email: usuario.email ?? null,
+      telefoneWhatsapp: usuario.telefone_whatsapp ?? null,
+    };
+  }
+
+  async garantirCandidatoPorWhatsApp(input: {
+    telefone: string;
+    dados: CurriculoPadraoData;
+  }): Promise<CandidatoRecord> {
+    const telefoneNorm = normalizarTelefoneWhatsApp(input.telefone);
+    const dadosLimpos = sanitizarCurriculoPadrao(input.dados);
+    const existente = await this.buscarCandidatoPorTelefone(telefoneNorm);
+
+    const nomeCompleto = dadosLimpos.nomeCompleto || existente?.candidato.nomeCompleto || 'Cidadão FAROL';
+    const nomeExibicao = nomeCompleto.trim().split(/\s+/).slice(0, 2).join(' ');
+    const bairro = dadosLimpos.bairro || existente?.candidato.bairro || 'São Luís';
+
+    const experienciasMapped = dadosLimpos.experiencias.map((exp, idx) => ({
+      id: `exp-${idx + 1}`,
+      cargoAtividade: exp.cargo,
+      empresaOuContexto: exp.empresa ?? null,
+      trabalhoInformal: Boolean(exp.trabalhoInformal),
+      periodo: [exp.periodo, exp.descricao].filter(Boolean).join(' — ') || null,
+    }));
+
+    if (existente) {
+      return this.atualizarCurriculoCandidato(existente.candidato.id, {
+        nomeCompleto,
+        nomeExibicao,
+        bairro,
+        escolaridade: dadosLimpos.escolaridade ?? existente.candidato.escolaridade,
+        areaInteresse: dadosLimpos.areaInteresse ?? existente.candidato.areaInteresse,
+        objetivo: dadosLimpos.objetivo ?? existente.candidato.objetivo,
+        resumoProfissional: dadosLimpos.resumoProfissional ?? existente.candidato.resumoProfissional,
+        disponibilidade: dadosLimpos.disponibilidade ?? existente.candidato.disponibilidade,
+        competencias:
+          dadosLimpos.competencias.length > 0
+            ? dadosLimpos.competencias
+            : existente.candidato.competencias,
+        experiencias:
+          experienciasMapped.length > 0 ? experienciasMapped : existente.candidato.experiencias,
+      });
+    }
+
+    const { data: usuario, error: uErr } = await this.db()
+      .from('usuarios')
+      .insert({
+        email: null,
+        senha_hash: null,
+        papel: 'CANDIDATO',
+        telefone_whatsapp: telefoneNorm,
+        whatsapp_verificado: true,
+      })
+      .select('id')
+      .single();
+
+    if (uErr) throw new Error(uErr.message);
+
+    const { data: cand, error: cErr } = await this.db()
+      .from('candidatos')
+      .insert({
+        usuario_id: usuario.id,
+        nome_completo: nomeCompleto,
+        nome_exibicao: nomeExibicao,
+        bairro,
+        municipio: dadosLimpos.municipio || 'São Luís',
+        escolaridade: dadosLimpos.escolaridade ?? null,
+        area_interesse: dadosLimpos.areaInteresse ?? null,
+        objetivo: dadosLimpos.objetivo ?? null,
+        resumo_profissional: dadosLimpos.resumoProfissional ?? null,
+        disponibilidade: dadosLimpos.disponibilidade ?? null,
+        consentimento_lgpd: true,
+        consentimento_em: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (cErr) throw new Error(cErr.message);
+
+    return this.atualizarCurriculoCandidato(cand.id, {
+      competencias: dadosLimpos.competencias,
+      experiencias: experienciasMapped,
+    });
+  }
+
+  async salvarCurriculoArquivo(input: {
+    candidatoId: string;
+    origem: 'UPLOAD_PDF' | 'UPLOAD_IMAGEM' | 'GERADO_SISTEMA';
+    nomeArquivo: string;
+    mimeType: string;
+    arquivoBase64: string;
+    dadosExtraidosJson: Record<string, unknown> | null;
+    confirmadoUsuario: boolean;
+  }): Promise<CurriculoArquivoRecord> {
+    const { data: created, error: insErr } = await this.db()
+      .from('curriculos_arquivos')
+      .insert({
+        candidato_id: input.candidatoId,
+        origem: input.origem,
+        arquivo_url: 'pending',
+        nome_arquivo: input.nomeArquivo,
+        mime_type: input.mimeType,
+        arquivo_base64: input.arquivoBase64,
+        dados_extraidos_json: input.dadosExtraidosJson,
+        confirmado_usuario: input.confirmadoUsuario,
+      })
+      .select('*')
+      .single();
+
+    if (insErr) throw new Error(insErr.message);
+
+    const downloadUrl = `/api/candidato/curriculo/arquivos/${created.id}/download`;
+    await this.db()
+      .from('curriculos_arquivos')
+      .update({ arquivo_url: downloadUrl })
+      .eq('id', created.id);
+
+    return {
+      id: created.id,
+      candidatoId: created.candidato_id,
+      origem: created.origem,
+      arquivoUrl: downloadUrl,
+      nomeArquivo: created.nome_arquivo ?? input.nomeArquivo,
+      mimeType: created.mime_type ?? input.mimeType,
+      arquivoBase64: created.arquivo_base64 ?? input.arquivoBase64,
+      dadosExtraidosJson: created.dados_extraidos_json ?? null,
+      confirmadoUsuario: Boolean(created.confirmado_usuario),
+      criadoEm: created.criado_em,
+    };
+  }
+
+  async listarCurriculosArquivosDoCandidato(candidatoId: string): Promise<CurriculoArquivoMetadata[]> {
+    const { data, error } = await this.db()
+      .from('curriculos_arquivos')
+      .select('id, candidato_id, origem, arquivo_url, nome_arquivo, mime_type, dados_extraidos_json, confirmado_usuario, criado_em')
+      .eq('candidato_id', candidatoId)
+      .order('criado_em', { ascending: false })
+      .limit(20);
+
+    if (error) throw new Error(error.message);
+
+    return (data ?? []).map((row: any) => ({
+      id: row.id,
+      candidatoId: row.candidato_id,
+      origem: row.origem,
+      arquivoUrl: row.arquivo_url,
+      nomeArquivo: row.nome_arquivo ?? 'Curriculo_FAROL.pdf',
+      mimeType: row.mime_type ?? 'application/pdf',
+      dadosExtraidosJson: row.dados_extraidos_json ?? null,
+      confirmadoUsuario: Boolean(row.confirmado_usuario),
+      criadoEm: row.criado_em,
+    }));
+  }
+
+  async obterCurriculoArquivoPorId(arquivoId: string): Promise<CurriculoArquivoRecord | null> {
+    const { data, error } = await this.db()
+      .from('curriculos_arquivos')
+      .select('*')
+      .eq('id', arquivoId)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      candidatoId: data.candidato_id,
+      origem: data.origem,
+      arquivoUrl: data.arquivo_url,
+      nomeArquivo: data.nome_arquivo ?? 'Curriculo_FAROL.pdf',
+      mimeType: data.mime_type ?? 'application/pdf',
+      arquivoBase64: data.arquivo_base64 ?? '',
+      dadosExtraidosJson: data.dados_extraidos_json ?? null,
+      confirmadoUsuario: Boolean(data.confirmado_usuario),
+      criadoEm: data.criado_em,
+    };
   }
 
   async criarCandidatura(input: {
@@ -794,32 +1088,81 @@ export class SupabaseFarolRepository {
     };
   }
 
-  async obterOuCriarConversaWhatsApp(telefone: string): Promise<ConversaWhatsAppRecord> {
+  private mapConversaRow(row: any): ConversaWhatsAppRecord {
+    return {
+      id: row.id,
+      telefone: row.telefone,
+      remoteJid: row.remote_jid ?? null,
+      pushName: row.push_name ?? null,
+      candidatoId: row.candidato_id ?? null,
+      estadoAtual: row.estado_atual,
+      contextoJson: row.contexto_json ?? {},
+      atendimentoHumano: Boolean(row.atendimento_humano),
+      botPausedUntil: row.bot_paused_until ?? null,
+      topicoAtual: row.topico_atual ?? null,
+      turnosSessao: Number(row.turnos_sessao ?? 0),
+      ultimaInteracaoEm: row.ultima_interacao_em,
+    };
+  }
+
+  async obterOuCriarConversaWhatsApp(
+    telefone: string,
+    meta?: { remoteJid?: string; pushName?: string }
+  ): Promise<ConversaWhatsAppRecord> {
+    const telefoneNorm = normalizarTelefoneWhatsApp(telefone);
     const { data: existing, error: selErr } = await this.db()
       .from('conversas_whatsapp')
       .select('*')
-      .eq('telefone', telefone)
+      .eq('telefone', telefoneNorm)
       .maybeSingle();
 
     if (selErr) throw new Error(selErr.message);
 
     if (existing) {
-      return {
-        id: existing.id,
-        telefone: existing.telefone,
-        candidatoId: existing.candidato_id,
-        estadoAtual: existing.estado_atual,
-        contextoJson: existing.contexto_json ?? {},
-        atendimentoHumano: Boolean(existing.atendimento_humano),
-        ultimaInteracaoEm: existing.ultima_interacao_em,
-      };
+      const pauseExpired =
+        Boolean(existing.bot_paused_until) &&
+        new Date(existing.bot_paused_until).getTime() <= Date.now();
+
+      const patch: Record<string, unknown> = {};
+      if (meta?.remoteJid && meta.remoteJid !== existing.remote_jid) {
+        patch.remote_jid = meta.remoteJid;
+      }
+      if (meta?.pushName && meta.pushName !== existing.push_name) {
+        patch.push_name = meta.pushName;
+      }
+      if (pauseExpired) {
+        patch.bot_paused_until = null;
+        patch.atendimento_humano = false;
+      }
+      if (!existing.candidato_id) {
+        const encontrado = await this.buscarCandidatoPorTelefone(telefoneNorm);
+        if (encontrado?.candidato.id) {
+          patch.candidato_id = encontrado.candidato.id;
+        }
+      }
+
+      if (Object.keys(patch).length > 0) {
+        const { data: updated } = await this.db()
+          .from('conversas_whatsapp')
+          .update(patch)
+          .eq('id', existing.id)
+          .select('*')
+          .single();
+        if (updated) return this.mapConversaRow(updated);
+      }
+
+      return this.mapConversaRow(existing);
     }
 
-    const { data: usuario } = await this.db()
-      .from('usuarios')
-      .select('id, candidatos(id, consentimento_lgpd)')
-      .eq('telefone_whatsapp', telefone)
-      .maybeSingle();
+    const variacoes = gerarVariacoesTelefoneWhatsApp(telefoneNorm);
+    const { data: usuario } = variacoes.length
+      ? await this.db()
+          .from('usuarios')
+          .select('id, candidatos(id, consentimento_lgpd)')
+          .in('telefone_whatsapp', variacoes)
+          .limit(1)
+          .maybeSingle()
+      : { data: null };
 
     const cand = Array.isArray(usuario?.candidatos) ? usuario?.candidatos[0] : usuario?.candidatos;
     const estadoInicial: EstadoConversaIA = cand?.consentimento_lgpd ? 'MATCH' : 'NOVO';
@@ -827,7 +1170,9 @@ export class SupabaseFarolRepository {
     const { data: created, error: insErr } = await this.db()
       .from('conversas_whatsapp')
       .insert({
-        telefone,
+        telefone: telefoneNorm,
+        remote_jid: meta?.remoteJid ?? null,
+        push_name: meta?.pushName ?? null,
         candidato_id: cand?.id ?? null,
         estado_atual: estadoInicial,
         contexto_json: {},
@@ -838,15 +1183,7 @@ export class SupabaseFarolRepository {
 
     if (insErr) throw new Error(insErr.message);
 
-    return {
-      id: created.id,
-      telefone: created.telefone,
-      candidatoId: created.candidato_id,
-      estadoAtual: created.estado_atual,
-      contextoJson: created.contexto_json ?? {},
-      atendimentoHumano: Boolean(created.atendimento_humano),
-      ultimaInteracaoEm: created.ultima_interacao_em,
-    };
+    return this.mapConversaRow(created);
   }
 
   async atualizarEstadoConversaWhatsApp(
@@ -855,7 +1192,8 @@ export class SupabaseFarolRepository {
     contextoPatch?: Record<string, unknown>,
     atendimentoHumano?: boolean
   ): Promise<ConversaWhatsAppRecord> {
-    const conv = await this.obterOuCriarConversaWhatsApp(telefone);
+    const telefoneNorm = normalizarTelefoneWhatsApp(telefone);
+    const conv = await this.obterOuCriarConversaWhatsApp(telefoneNorm);
     const novoContexto = contextoPatch ? { ...conv.contextoJson, ...contextoPatch } : conv.contextoJson;
 
     const { data, error } = await this.db()
@@ -866,21 +1204,140 @@ export class SupabaseFarolRepository {
         atendimento_humano: typeof atendimentoHumano === 'boolean' ? atendimentoHumano : conv.atendimentoHumano,
         ultima_interacao_em: new Date().toISOString(),
       })
-      .eq('telefone', telefone)
+      .eq('id', conv.id)
       .select('*')
       .single();
 
     if (error) throw new Error(error.message);
 
-    return {
-      id: data.id,
-      telefone: data.telefone,
-      candidatoId: data.candidato_id,
-      estadoAtual: data.estado_atual,
-      contextoJson: data.contexto_json ?? {},
-      atendimentoHumano: Boolean(data.atendimento_humano),
-      ultimaInteracaoEm: data.ultima_interacao_em,
-    };
+    return this.mapConversaRow(data);
+  }
+
+  async mensagemWhatsAppJaProcessada(evolutionMessageId: string): Promise<boolean> {
+    if (!evolutionMessageId) return false;
+    const { data, error } = await this.db()
+      .from('mensagens_whatsapp')
+      .select('id')
+      .eq('evolution_message_id', evolutionMessageId)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) return false;
+    return Boolean(data);
+  }
+
+  async salvarMensagemWhatsApp(input: {
+    conversaId: string;
+    direcao: 'ENTRADA' | 'SAIDA';
+    tipoMidia: 'TEXTO' | 'AUDIO' | 'DOCUMENTO' | 'IMAGEM';
+    conteudoTexto?: string | null;
+    transcricaoAudio?: string | null;
+    resumoMidia?: string | null;
+    metadataJson?: Record<string, unknown>;
+    evolutionMessageId?: string | null;
+  }): Promise<boolean> {
+    const { error } = await this.db()
+      .from('mensagens_whatsapp')
+      .insert({
+        conversa_id: input.conversaId,
+        direcao: input.direcao,
+        tipo_midia: input.tipoMidia,
+        conteudo_texto: input.conteudoTexto ?? null,
+        transcricao_audio: input.transcricaoAudio ?? null,
+        resumo_midia: input.resumoMidia ?? null,
+        metadata_json: input.metadataJson ?? {},
+        evolution_message_id: input.evolutionMessageId ?? null,
+      });
+
+    if (error) {
+      // Unique constraint violation (23505) garante idempotência atômica
+      if (error.code === '23505') return false;
+      throw new Error(error.message);
+    }
+    return true;
+  }
+
+  async listarHistoricoMensagensWhatsApp(
+    conversaId: string,
+    limite: number,
+    ttlMinutos: number
+  ): Promise<MensagemWhatsAppRecord[]> {
+    const cutoffIso = new Date(Date.now() - ttlMinutos * 60_000).toISOString();
+    const { data, error } = await this.db()
+      .from('mensagens_whatsapp')
+      .select('*')
+      .eq('conversa_id', conversaId)
+      .gte('criado_em', cutoffIso)
+      .order('criado_em', { ascending: false })
+      .limit(limite);
+
+    if (error) throw new Error(error.message);
+
+    return (data ?? []).reverse().map((row: any) => ({
+      id: row.id,
+      conversaId: row.conversa_id,
+      direcao: row.direcao,
+      tipoMidia: row.tipo_midia,
+      conteudoTexto: row.conteudo_texto ?? null,
+      transcricaoAudio: row.transcricao_audio ?? null,
+      resumoMidia: row.resumo_midia ?? null,
+      metadataJson: row.metadata_json ?? {},
+      evolutionMessageId: row.evolution_message_id ?? null,
+      criadoEm: row.criado_em,
+    }));
+  }
+
+  async pausarBotConversaWhatsApp(telefone: string, minutos: number): Promise<void> {
+    const conv = await this.obterOuCriarConversaWhatsApp(telefone);
+    const pausedUntil = new Date(Date.now() + minutos * 60_000).toISOString();
+    const { error } = await this.db()
+      .from('conversas_whatsapp')
+      .update({
+        bot_paused_until: pausedUntil,
+        atendimento_humano: true,
+        estado_atual: 'ATENDIMENTO_HUMANO',
+        ultima_interacao_em: new Date().toISOString(),
+      })
+      .eq('id', conv.id);
+
+    if (error) throw new Error(error.message);
+  }
+
+  async atualizarTopicoConversaWhatsApp(conversaId: string, topico: string | null): Promise<void> {
+    const { error } = await this.db()
+      .from('conversas_whatsapp')
+      .update({ topico_atual: topico })
+      .eq('id', conversaId);
+    if (error) throw new Error(error.message);
+  }
+
+  async vincularCandidatoConversaWhatsApp(conversaId: string, candidatoId: string): Promise<void> {
+    const { error } = await this.db()
+      .from('conversas_whatsapp')
+      .update({ candidato_id: candidatoId })
+      .eq('id', conversaId);
+    if (error) throw new Error(error.message);
+  }
+
+  async incrementarTurnoConversaWhatsApp(conversaId: string): Promise<void> {
+    const { error: rpcErr } = await this.db().rpc('fn_incrementar_turno_conversa_whatsapp', {
+      p_conversa_id: conversaId,
+    });
+    if (!rpcErr) return;
+
+    const { data } = await this.db()
+      .from('conversas_whatsapp')
+      .select('turnos_sessao')
+      .eq('id', conversaId)
+      .maybeSingle();
+
+    await this.db()
+      .from('conversas_whatsapp')
+      .update({
+        turnos_sessao: Number(data?.turnos_sessao ?? 0) + 1,
+        ultima_interacao_em: new Date().toISOString(),
+      })
+      .eq('id', conversaId);
   }
 
   // --------------------------------------------------------------------------

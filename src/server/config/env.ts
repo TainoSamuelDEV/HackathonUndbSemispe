@@ -14,6 +14,9 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   AI_INTERNAL_API_KEY: z.string().default('farol-ai-internal-dev-key'),
+  WHATSAPP_BOT_PAUSE_MINUTES: z.coerce.number().int().min(1).max(240).default(20),
+  WHATSAPP_HISTORY_LIMIT: z.coerce.number().int().min(10).max(100).default(40),
+  WHATSAPP_HISTORY_TTL_MINUTES: z.coerce.number().int().min(60).max(43200).default(10080),
 });
 
 export type ServerEnv = z.infer<typeof envSchema>;

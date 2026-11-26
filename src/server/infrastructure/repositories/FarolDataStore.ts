@@ -1,3 +1,4 @@
+import type { CurriculoArquivoRecord } from '@/server/domain/curriculo/CurriculoPadrao';
 import { hojeEmSaoLuis, instanteEmSaoLuis, somarDias } from '@/lib/datasSaoLuis';
 import type {
   CanalOrigem,
@@ -172,12 +173,32 @@ export interface PedidoCursoRecord {
 export interface ConversaWhatsAppRecord {
   id: string;
   telefone: string;
+  remoteJid: string | null;
+  pushName: string | null;
   candidatoId: string | null;
   estadoAtual: EstadoConversaIA;
   contextoJson: Record<string, unknown>;
   atendimentoHumano: boolean;
+  botPausedUntil: string | null;
+  topicoAtual: string | null;
+  turnosSessao: number;
   ultimaInteracaoEm: string;
 }
+
+export interface MensagemWhatsAppRecord {
+  id: string;
+  conversaId: string;
+  direcao: 'ENTRADA' | 'SAIDA';
+  tipoMidia: 'TEXTO' | 'AUDIO' | 'DOCUMENTO' | 'IMAGEM';
+  conteudoTexto: string | null;
+  transcricaoAudio: string | null;
+  resumoMidia: string | null;
+  metadataJson: Record<string, unknown>;
+  evolutionMessageId: string | null;
+  criadoEm: string;
+}
+
+export type { CurriculoArquivoRecord };
 
 export interface EditalRecord {
   id: string;
@@ -563,6 +584,8 @@ class InMemoryFarolStore {
   ];
 
   public conversasWhatsApp: ConversaWhatsAppRecord[] = [];
+  public mensagensWhatsApp: MensagemWhatsAppRecord[] = [];
+  public curriculosArquivos: CurriculoArquivoRecord[] = [];
 
   // Mesmo conteúdo da migration 20261125000005_conteudo_exemplo_editais_eventos.sql
   public editais: EditalRecord[] = [
