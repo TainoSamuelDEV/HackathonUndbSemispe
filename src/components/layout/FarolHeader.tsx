@@ -1,11 +1,17 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Menu, X, User, LogOut } from 'lucide-react';
 import type { UsuarioSessao } from '@/types/farol';
 
+/**
+ * Header flutuante em pílula. Na página principal ele fica sobre a mídia da hero
+ * (a hero compensa a altura com margem negativa: 72px no mobile, 76px a partir de sm).
+ */
 export function FarolHeader() {
+  const pathname = usePathname();
   const [menuAberto, setMenuAberto] = useState(false);
   const [usuario, setUsuario] = useState<UsuarioSessao | null>(null);
 
@@ -15,6 +21,11 @@ export function FarolHeader() {
       .then((res) => setUsuario(res?.data?.usuario ?? null))
       .catch(() => setUsuario(null));
   }, []);
+
+  // Fecha o menu mobile ao trocar de página
+  useEffect(() => {
+    setMenuAberto(false);
+  }, [pathname]);
 
   async function sair() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -29,127 +40,149 @@ export function FarolHeader() {
         ? '/empresa'
         : '/painel';
 
+  const links = [
+    { href: '/', label: 'Página Principal' },
+    { href: '/vagas', label: 'Vagas' },
+    { href: '/cursos', label: 'Cursos' },
+    { href: '/newsletter', label: 'Newsletter' },
+    { href: usuario ? rotaPainel : '/entrar?next=/painel', label: 'Meu Currículo' },
+    { href: '/sobre', label: 'Sobre o FAROL' },
+  ];
+
+  function ativo(href: string) {
+    if (href.includes('?')) return false;
+    if (href === '/') return pathname === '/';
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-[#DCE7EF]">
-      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 h-[76px] flex items-center justify-between gap-4">
-        <Link href="/" className="flex items-center gap-3 min-h-[44px]">
-          <img
-            src="/logos/logo-pqt.png"
-            alt="Parque Tecnológico de São Luís"
-            className="h-9 w-auto object-contain"
-          />
-          <div className="border-l border-[#DCE7EF] pl-3">
-            <span className="font-heading font-extrabold text-xl text-[#0162A7] tracking-tight block leading-none">
+    <header className="sticky top-0 z-40 px-3 sm:px-4 pt-3">
+      <div className="relative max-w-[1200px] mx-auto">
+        <div className="h-[60px] sm:h-16 flex items-center justify-between gap-3 rounded-full bg-white/95 backdrop-blur-md border border-[#DCE7EF] shadow-[0_8px_30px_rgba(11,37,64,0.10)] pl-3 sm:pl-5 pr-2">
+          <Link href="/" className="flex items-center gap-2.5 sm:gap-3 min-h-[44px] shrink-0">
+            <img
+              src="/logos/logo-pqt.png"
+              alt="Parque Tecnológico de São Luís"
+              className="h-8 sm:h-9 w-auto object-contain"
+            />
+            <span className="border-l border-[#DCE7EF] pl-2.5 sm:pl-3 font-heading font-extrabold text-lg sm:text-xl text-[#0162A7] tracking-tight leading-none">
               FAROL
             </span>
-            <span className="text-[11px] font-medium text-[#66788A] hidden sm:block">
-              Rede de Oportunidades · São Luís
-            </span>
-          </div>
-        </Link>
+          </Link>
 
-        <nav className="hidden lg:flex items-center gap-6 text-sm font-semibold text-[#0B2540]">
-          <Link href="/" className="hover:text-[#0162A7] transition-colors py-2">
-            Página Principal
-          </Link>
-          <Link href="/vagas" className="hover:text-[#0162A7] transition-colors py-2">
-            Vagas
-          </Link>
-          <Link href="/cursos" className="hover:text-[#0162A7] transition-colors py-2">
-            Cursos
-          </Link>
-          <Link href="/newsletter" className="hover:text-[#0162A7] transition-colors py-2">
-            Newsletter
-          </Link>
-          <Link
-            href={usuario ? rotaPainel : '/entrar?next=/painel'}
-            className="hover:text-[#0162A7] transition-colors py-2"
-          >
-            Meu Currículo
-          </Link>
-          <Link href="/sobre" className="hover:text-[#0162A7] transition-colors py-2">
-            Sobre o FAROL
-          </Link>
-        </nav>
-
-        <div className="hidden lg:flex items-center gap-3">
-          {usuario ? (
-            <>
+          <nav aria-label="Principal" className="hidden lg:flex items-center gap-1 text-sm font-semibold">
+            {links.map((l) => (
               <Link
-                href={rotaPainel}
-                className="inline-flex items-center gap-2 min-h-[44px] px-4 rounded-[12px] bg-[#E7F3FA] text-[#0162A7] text-sm font-bold hover:bg-[#d7ecfa] transition-colors"
+                key={l.label}
+                href={l.href}
+                aria-current={ativo(l.href) ? 'page' : undefined}
+                className={`px-3 py-2 rounded-full transition-colors ${
+                  ativo(l.href)
+                    ? 'bg-[#EFF7FC] text-[#0162A7]'
+                    : 'text-[#0B2540] hover:text-[#0162A7]'
+                }`}
               >
-                <User className="w-4 h-4" />
-                {usuario.nome}
+                {l.label}
               </Link>
-              <button
-                onClick={sair}
-                className="inline-flex items-center justify-center min-h-[44px] px-3 rounded-[12px] border border-[#DCE7EF] text-[#66788A] hover:text-[#B53832] transition-colors"
-                title="Sair"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </>
-          ) : (
-            <Link
-              href="/entrar"
-              className="inline-flex items-center justify-center min-h-[42px] px-6 rounded-full bg-[#FADC00] text-[#0B2540] text-sm font-bold hover:bg-[#E8CB00] transition-colors"
-            >
-              Entrar
-            </Link>
-          )}
-        </div>
+            ))}
+          </nav>
 
-        <button
-          onClick={() => setMenuAberto(!menuAberto)}
-          className="lg:hidden min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-[12px] border border-[#DCE7EF]"
-          aria-label="Abrir menu"
-        >
-          {menuAberto ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-      </div>
-
-      {menuAberto && (
-        <div className="lg:hidden border-t border-[#DCE7EF] bg-white px-4 py-4 space-y-2">
-          <Link href="/" onClick={() => setMenuAberto(false)} className="block py-3 font-semibold border-b border-[#F3F8FC]">
-            Página Principal
-          </Link>
-          <Link href="/vagas" onClick={() => setMenuAberto(false)} className="block py-3 font-semibold border-b border-[#F3F8FC]">
-            Vagas
-          </Link>
-          <Link href="/cursos" onClick={() => setMenuAberto(false)} className="block py-3 font-semibold border-b border-[#F3F8FC]">
-            Cursos
-          </Link>
-          <Link href="/newsletter" onClick={() => setMenuAberto(false)} className="block py-3 font-semibold border-b border-[#F3F8FC]">
-            Newsletter & Eventos
-          </Link>
-          <Link href={usuario ? rotaPainel : '/entrar'} onClick={() => setMenuAberto(false)} className="block py-3 font-semibold border-b border-[#F3F8FC]">
-            Meu Currículo
-          </Link>
-          <Link href="/sobre" onClick={() => setMenuAberto(false)} className="block py-3 font-semibold border-b border-[#F3F8FC]">
-            Sobre o FAROL
-          </Link>
-          <div className="pt-2">
+          <div className="flex items-center gap-1.5">
             {usuario ? (
-              <Link
-                href={rotaPainel}
-                onClick={() => setMenuAberto(false)}
-                className="block w-full text-center py-3 rounded-[12px] bg-[#0162A7] text-white font-bold"
-              >
-                Acessar Painel ({usuario.nome})
-              </Link>
+              <div className="hidden lg:flex items-center gap-1.5">
+                <Link
+                  href={rotaPainel}
+                  className="inline-flex items-center gap-2 h-11 max-w-[220px] px-4 rounded-full bg-[#EFF7FC] text-[#0162A7] text-sm font-bold hover:bg-[#d7ecfa] transition-colors"
+                >
+                  <User className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{usuario.nome}</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={sair}
+                  className="inline-flex items-center justify-center w-11 h-11 rounded-full text-[#66788A] hover:text-[#B53832] hover:bg-[#FCF1F0] transition-colors"
+                  title="Sair"
+                  aria-label="Sair da conta"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
             ) : (
               <Link
                 href="/entrar"
-                onClick={() => setMenuAberto(false)}
-                className="block w-full text-center py-3 rounded-[12px] bg-[#FADC00] text-[#0B2540] font-bold"
+                className="hidden sm:inline-flex items-center justify-center h-11 px-6 rounded-full bg-[#0162A7] text-white text-sm font-bold hover:bg-[#004F8A] transition-colors"
               >
                 Entrar
               </Link>
             )}
+
+            <button
+              type="button"
+              onClick={() => setMenuAberto((v) => !v)}
+              className="lg:hidden inline-flex items-center justify-center w-11 h-11 rounded-full border border-[#DCE7EF] text-[#0B2540]"
+              aria-label={menuAberto ? 'Fechar menu' : 'Abrir menu'}
+              aria-expanded={menuAberto}
+              aria-controls="menu-mobile"
+            >
+              {menuAberto ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
-      )}
+
+        {/* Menu mobile em card arredondado */}
+        {menuAberto && (
+          <div
+            id="menu-mobile"
+            className="lg:hidden absolute left-0 right-0 top-full mt-2 rounded-[24px] bg-white border border-[#DCE7EF] shadow-[0_16px_40px_rgba(11,37,64,0.16)] p-2"
+          >
+            <nav aria-label="Principal">
+              {links.map((l) => (
+                <Link
+                  key={l.label}
+                  href={l.href}
+                  onClick={() => setMenuAberto(false)}
+                  aria-current={ativo(l.href) ? 'page' : undefined}
+                  className={`flex items-center min-h-[48px] px-4 rounded-2xl font-semibold transition-colors ${
+                    ativo(l.href) ? 'bg-[#EFF7FC] text-[#0162A7]' : 'text-[#0B2540] hover:bg-[#F3F8FC]'
+                  }`}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="p-2 pt-3">
+              {usuario ? (
+                <div className="flex gap-2">
+                  <Link
+                    href={rotaPainel}
+                    onClick={() => setMenuAberto(false)}
+                    className="flex-1 inline-flex items-center justify-center gap-2 h-12 rounded-full bg-[#0162A7] text-white font-bold"
+                  >
+                    <User className="w-4 h-4" />
+                    Acessar painel
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={sair}
+                    className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-[#DCE7EF] text-[#66788A]"
+                    aria-label="Sair da conta"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href="/entrar"
+                  onClick={() => setMenuAberto(false)}
+                  className="flex items-center justify-center h-12 rounded-full bg-[#0162A7] text-white font-bold"
+                >
+                  Entrar
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </header>
   );
 }
