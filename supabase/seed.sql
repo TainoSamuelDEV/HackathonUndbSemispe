@@ -34,12 +34,12 @@ VALUES
   ('20000000-0000-0000-0000-000000000002', 'Controle de estoque', 'controle de estoque', 'CONHECIMENTO')
 ON CONFLICT (candidato_id, nome_normalizado) DO NOTHING;
 
-INSERT INTO vagas (id, empresa_id, titulo, area, descricao, bairro, modalidade, tipo_contratacao, quantidade_vagas, salario_min, escolaridade_minima, jornada, selo_simulado, status, publicada_em, encerra_em)
+INSERT INTO vagas (id, empresa_id, titulo, area, descricao, bairro, modalidade, tipo_contratacao, quantidade_vagas, salario_min, escolaridade_minima, jornada, imagem_capa_url, selo_simulado, status, publicada_em, encerra_em)
 VALUES
-  ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Ajudante de Manutenção Industrial', 'Manutenção e mecânica', 'Apoio às rotinas de manutenção preventiva e corretiva em equipamentos de pátio e oficina.', 'Itaqui-Bacanga', 'PRESENCIAL', 'CLT', 3, 1850.00, 'MEDIO_COMPLETO', '44h semanais (escala)', TRUE, 'PUBLICADA', NOW(), NOW() + INTERVAL '30 days'),
-  ('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Auxiliar de Logística e Almoxarifado', 'Logística e transporte', 'Conferência de materiais, organização de estoque e apoio ao carregamento.', 'Vila Maranhão', 'PRESENCIAL', 'CLT', 2, 1750.00, 'MEDIO_COMPLETO', 'Comercial', TRUE, 'PUBLICADA', NOW(), NOW() + INTERVAL '25 days'),
-  ('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000002', 'Assistente de Atendimento Digital', 'Administrativo', 'Atendimento a clientes, organização de planilhas e suporte operacional a startup local.', 'Anjo da Guarda', 'HIBRIDO', 'CLT', 1, 1900.00, 'MEDIO_COMPLETO', 'Segunda a sexta', TRUE, 'PUBLICADA', NOW(), NOW() + INTERVAL '20 days')
-ON CONFLICT (id) DO NOTHING;
+  ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'Ajudante de Manutenção Industrial', 'Manutenção e mecânica', 'Apoio às rotinas de manutenção preventiva e corretiva em equipamentos de pátio e oficina.', 'Itaqui-Bacanga', 'PRESENCIAL', 'CLT', 3, 1850.00, 'MEDIO_COMPLETO', '44h semanais (escala)', '/vagas/capas/ajudante-manutencao.jpg', TRUE, 'PUBLICADA', NOW(), NOW() + INTERVAL '30 days'),
+  ('30000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'Auxiliar de Logística e Almoxarifado', 'Logística e transporte', 'Conferência de materiais, organização de estoque e apoio ao carregamento.', 'Vila Maranhão', 'PRESENCIAL', 'CLT', 2, 1750.00, 'MEDIO_COMPLETO', 'Comercial', '/vagas/capas/auxiliar-logistica.jpg', TRUE, 'PUBLICADA', NOW(), NOW() + INTERVAL '25 days'),
+  ('30000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000002', 'Assistente de Atendimento Digital', 'Administrativo', 'Atendimento a clientes, organização de planilhas e suporte operacional a startup local.', 'Anjo da Guarda', 'HIBRIDO', 'CLT', 1, 1900.00, 'MEDIO_COMPLETO', 'Segunda a sexta', '/vagas/capas/assistente-atendimento-digital.jpg', TRUE, 'PUBLICADA', NOW(), NOW() + INTERVAL '20 days')
+ON CONFLICT (id) DO UPDATE SET imagem_capa_url = EXCLUDED.imagem_capa_url;
 
 INSERT INTO vaga_requisitos (vaga_id, nome, nome_normalizado, tipo, obrigatorio)
 VALUES
@@ -50,12 +50,12 @@ VALUES
   ('30000000-0000-0000-0000-000000000003', 'Atendimento ao público', 'atendimento ao publico', 'CONHECIMENTO', TRUE),
   ('30000000-0000-0000-0000-000000000003', 'Pacote Office', 'pacote office', 'CONHECIMENTO', FALSE);
 
-INSERT INTO cursos (id, titulo, area, descricao, competencias_desenvolvidas, instituicao, modalidade, carga_horaria, tipo, selo_simulado, status)
+INSERT INTO cursos (id, titulo, area, descricao, competencias_desenvolvidas, instituicao, modalidade, carga_horaria, tipo, imagem_capa_url, selo_simulado, status)
 VALUES
-  ('40000000-0000-0000-0000-000000000001', 'NR-12: Segurança no Trabalho em Máquinas e Equipamentos', 'Segurança do trabalho', 'Capacitação gratuita para operação segura de máquinas industriais e prevenção de acidentes.', '["Curso de NR-12", "Segurança industrial"]'::jsonb, 'SEMISPE / Parceiro Técnico', 'PRESENCIAL', 16, 'PROGRAMADO', TRUE, 'ATIVO'),
-  ('40000000-0000-0000-0000-000000000002', 'Informática Básica e Pacote Office para o Trabalho', 'Administrativo', 'Uso prático de computador, planilhas, documentos e comunicação profissional.', '["Pacote Office", "Atendimento ao público"]'::jsonb, 'SEMISPE / Polo Itaqui-Bacanga', 'PRESENCIAL', 40, 'PROGRAMADO', TRUE, 'ATIVO'),
-  ('40000000-0000-0000-0000-000000000003', 'Operador de Empilhadeira e Logística Portuária', 'Logística e transporte', 'Formação sob demanda para movimentação de cargas no eixo Itaqui-Bacanga.', '["Operação de empilhadeira", "Controle de estoque"]'::jsonb, 'SEMISPE (Previsão com parceiros)', 'PRESENCIAL', 60, 'SOB_DEMANDA', TRUE, 'ATIVO')
-ON CONFLICT (id) DO NOTHING;
+  ('40000000-0000-0000-0000-000000000001', 'NR-12: Segurança no Trabalho em Máquinas e Equipamentos', 'Segurança do trabalho', 'Capacitação gratuita para operação segura de máquinas industriais e prevenção de acidentes.', '["Curso de NR-12", "Segurança industrial"]'::jsonb, 'SEMISPE / Parceiro Técnico', 'PRESENCIAL', 16, 'PROGRAMADO', '/cursos/capas/nr12-seguranca-maquinas.jpg', TRUE, 'ATIVO'),
+  ('40000000-0000-0000-0000-000000000002', 'Informática Básica e Pacote Office para o Trabalho', 'Administrativo', 'Uso prático de computador, planilhas, documentos e comunicação profissional.', '["Pacote Office", "Atendimento ao público"]'::jsonb, 'SEMISPE / Polo Itaqui-Bacanga', 'PRESENCIAL', 40, 'PROGRAMADO', '/cursos/capas/informatica-pacote-office.jpg', TRUE, 'ATIVO'),
+  ('40000000-0000-0000-0000-000000000003', 'Operador de Empilhadeira e Logística Portuária', 'Logística e transporte', 'Formação sob demanda para movimentação de cargas no eixo Itaqui-Bacanga.', '["Operação de empilhadeira", "Controle de estoque"]'::jsonb, 'SEMISPE (Previsão com parceiros)', 'PRESENCIAL', 60, 'SOB_DEMANDA', '/cursos/capas/operador-empilhadeira-portuaria.jpg', TRUE, 'ATIVO')
+ON CONFLICT (id) DO UPDATE SET imagem_capa_url = EXCLUDED.imagem_capa_url;
 
 INSERT INTO turmas (id, curso_id, codigo_turma, local_bairro, vagas_totais, inscricao_inicio, inscricao_fim, data_inicio, data_fim, horario, responsavel, status)
 VALUES

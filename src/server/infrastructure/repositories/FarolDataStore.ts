@@ -86,6 +86,8 @@ export interface VagaRecord {
   beneficios: string[];
   origemTipo: OrigemVaga;
   origemUrl: string | null;
+  /** URL https ou caminho local (/vagas/capas/...). Nulo = imagem padrão da área. */
+  imagemCapaUrl: string | null;
   seloSimulado: boolean;
   status: StatusVaga;
   publicadaEm: string;
@@ -123,6 +125,8 @@ export interface CursoRecord {
   cargaHoraria: number;
   preRequisitos: string | null;
   tipo: TipoCurso;
+  /** URL https ou caminho local (/cursos/capas/...). Nulo = imagem padrão do tema. */
+  imagemCapaUrl: string | null;
   seloSimulado: boolean;
   status: StatusCurso;
   turmas: Array<{
@@ -332,6 +336,7 @@ class InMemoryFarolStore {
       beneficios: ['Vale-transporte', 'Vale-alimentação'],
       origemTipo: 'INTERNA',
       origemUrl: null,
+      imagemCapaUrl: '/vagas/capas/ajudante-manutencao.jpg',
       seloSimulado: true,
       status: 'PUBLICADA',
       publicadaEm: new Date().toISOString(),
@@ -360,6 +365,7 @@ class InMemoryFarolStore {
       beneficios: ['Vale-transporte', 'Refeitório no local'],
       origemTipo: 'INTERNA',
       origemUrl: null,
+      imagemCapaUrl: '/vagas/capas/auxiliar-logistica.jpg',
       seloSimulado: true,
       status: 'PUBLICADA',
       publicadaEm: new Date().toISOString(),
@@ -388,6 +394,7 @@ class InMemoryFarolStore {
       beneficios: ['Vale-transporte', 'Auxílio home office'],
       origemTipo: 'INTERNA',
       origemUrl: null,
+      imagemCapaUrl: '/vagas/capas/assistente-atendimento-digital.jpg',
       seloSimulado: true,
       status: 'PUBLICADA',
       publicadaEm: new Date().toISOString(),
@@ -413,6 +420,7 @@ class InMemoryFarolStore {
       cargaHoraria: 16,
       preRequisitos: 'Ensino Fundamental completo',
       tipo: 'PROGRAMADO',
+      imagemCapaUrl: '/cursos/capas/nr12-seguranca-maquinas.jpg',
       seloSimulado: true,
       status: 'ATIVO',
       turmas: [
@@ -438,6 +446,7 @@ class InMemoryFarolStore {
       cargaHoraria: 40,
       preRequisitos: null,
       tipo: 'PROGRAMADO',
+      imagemCapaUrl: '/cursos/capas/informatica-pacote-office.jpg',
       seloSimulado: true,
       status: 'ATIVO',
       turmas: [
@@ -463,6 +472,7 @@ class InMemoryFarolStore {
       cargaHoraria: 60,
       preRequisitos: 'Ensino Médio completo',
       tipo: 'SOB_DEMANDA',
+      imagemCapaUrl: '/cursos/capas/operador-empilhadeira-portuaria.jpg',
       seloSimulado: true,
       status: 'ATIVO',
       turmas: [],

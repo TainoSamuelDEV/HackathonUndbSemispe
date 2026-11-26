@@ -28,6 +28,16 @@ const novaVagaSchema = z.object({
     .optional(),
   jornada: z.string().nullable().optional(),
   beneficios: z.array(z.string()).optional(),
+  // Imagem de capa opcional: apenas https (string vazia vira null → imagem padrão da área)
+  imagemCapaUrl: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim() === '' ? null : typeof v === 'string' ? v.trim() : v),
+    z
+      .string()
+      .max(2000)
+      .regex(/^https:\/\/\S+$/i, 'Informe um endereço de imagem começando com https://')
+      .nullable()
+      .optional()
+  ),
   requisitos: z
     .array(
       z.object({

@@ -46,6 +46,7 @@ function mapVagaRow(row: any): VagaRecord {
     beneficios: Array.isArray(row.beneficios) ? row.beneficios : [],
     origemTipo: row.origem_tipo,
     origemUrl: row.origem_url,
+    imagemCapaUrl: row.imagem_capa_url ?? null,
     seloSimulado: Boolean(row.selo_simulado),
     status: row.status,
     publicadaEm: row.publicada_em ?? row.criado_em,
@@ -464,12 +465,15 @@ export class SupabaseFarolRepository {
       escolaridadeMinima?: NivelEscolaridade | null;
       jornada?: string | null;
       beneficios?: string[];
+      imagemCapaUrl?: string | null;
       requisitos: RequisitoVaga[];
     }
   ): Promise<VagaRecord> {
     const { data: vagaRow, error } = await this.db()
       .from('vagas')
       .insert({
+        // Só envia a coluna quando houver imagem: mantém compatível com bancos sem a migration 20261125000001
+        ...(input.imagemCapaUrl ? { imagem_capa_url: input.imagemCapaUrl } : {}),
         empresa_id: empresaId,
         titulo: input.titulo,
         area: input.area,
@@ -596,6 +600,7 @@ export class SupabaseFarolRepository {
       cargaHoraria: c.carga_horaria,
       preRequisitos: c.pre_requisitos,
       tipo: c.tipo,
+      imagemCapaUrl: c.imagem_capa_url ?? null,
       seloSimulado: Boolean(c.selo_simulado),
       status: c.status,
       turmas: (c.turmas ?? []).map((t: any) => ({

@@ -470,6 +470,7 @@ export class FarolService {
       escolaridadeMinima?: NivelEscolaridade | null;
       jornada?: string | null;
       beneficios?: string[];
+      imagemCapaUrl?: string | null;
       requisitos: RequisitoVaga[];
     }
   ): Promise<VagaRecord> {
@@ -499,6 +500,7 @@ export class FarolService {
       beneficios: input.beneficios ?? [],
       origemTipo: 'INTERNA',
       origemUrl: null,
+      imagemCapaUrl: input.imagemCapaUrl ?? null,
       seloSimulado: false,
       status: 'PUBLICADA',
       publicadaEm: new Date().toISOString(),
